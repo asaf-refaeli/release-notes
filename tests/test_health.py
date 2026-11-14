@@ -19,3 +19,12 @@ def test_version_returns_app_version(monkeypatch):
 
     assert response.status_code == 200
     assert response.json() == {"version": "1.2.3"}
+
+
+def test_metrics_counts_requests():
+    client.get("/api/version")
+
+    response = client.get("/metrics")
+
+    assert response.status_code == 200
+    assert 'handler="/api/version"' in response.text
