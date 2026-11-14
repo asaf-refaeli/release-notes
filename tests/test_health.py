@@ -10,3 +10,12 @@ def test_live_returns_ok():
 
     assert response.status_code == 200
     assert response.json() == {"status": "ok"}
+
+
+def test_version_returns_app_version(monkeypatch):
+    monkeypatch.setenv("APP_VERSION", "1.2.3")
+
+    response = client.get("/api/version")
+
+    assert response.status_code == 200
+    assert response.json() == {"version": "1.2.3"}
