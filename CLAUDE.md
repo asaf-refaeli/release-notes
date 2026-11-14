@@ -19,7 +19,7 @@ The plan lives outside this repo in `../docs/project-plan.md`.
 - Build the image: `buildah bud -t release-notes:local .`
 - Container integration test: `scripts/integration-test.sh <image>`
 - Rollout check: `uv run scripts/rollout_check.py --url <base-url>`
-- Runtime: Python 3.13, pinned in `.python-version` and the `Dockerfile`
+- Runtime: Python 3.14, pinned in `.python-version` and the `Dockerfile`
 
 The container runs `uvicorn` directly (exec-form `CMD`), so it is PID 1 and receives SIGTERM for graceful shutdown.
 
