@@ -26,9 +26,10 @@ The container runs `uvicorn` directly (exec-form `CMD`), so it is PID 1 and rece
 ## Architecture
 
 <!-- Planned, update as code lands. -->
-- `app/main.py`: `create_app()`, routers, exception handlers, `/healthz/live`, `/healthz/ready`, `/metrics`, `/api/version`
-- `app/config.py`: `Settings` from env vars only
-- `app/db.py`: engine and the `get_session` dependency
+- `app/main.py`: the `app` object, `lifespan` (creates the DB pool at startup, disposes it on shutdown), routers, exception handlers, `/healthz/live`, `/healthz/ready`, `/metrics`, `/api/version`. Settings are validated at import, so bad config stops the process before it serves.
+- `app/config.py`: `Settings` from env vars only; `get_settings()` is not cached
+- `app/log_config.py`: JSON logs to stdout; `/healthz/` access lines dropped
+- `app/db.py`: `get_engine()` (one pool per process) and the `get_session` dependency
 - `app/models.py`: SQLAlchemy models (`Release`, `ReleaseEvent`)
 - `app/schemas.py`: Pydantic request/response models; input models use `extra="forbid"`
 - `app/service.py`: business rules and domain exceptions; no HTTP code here
