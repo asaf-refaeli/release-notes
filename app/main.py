@@ -8,6 +8,9 @@ from sqlalchemy import Engine, text
 from sqlalchemy.exc import SQLAlchemyError
 
 from app.db import get_engine
+from app.log_config import setup_logging
+
+setup_logging(os.getenv("LOG_LEVEL", "INFO"))
 
 logger = logging.getLogger(__name__)
 
