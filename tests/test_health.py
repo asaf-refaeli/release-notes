@@ -1,7 +1,6 @@
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
-from testcontainers.community.postgres import PostgresContainer
 
 from app.db import get_engine
 from app.main import app
@@ -50,23 +49,8 @@ def test_ready_returns_503_when_db_down(dead_database):
     assert client.get("/healthz/live").status_code == 200
 
 
-@pytest.fixture(scope="session")
-def postgres_url():
-    with PostgresContainer("postgres:18", driver="psycopg") as postgres:
-        yield postgres.get_connection_url()
-
-
-@pytest.fixture
-def live_database(postgres_url):
-    engine = create_engine(postgres_url)
-    app.dependency_overrides[get_engine] = lambda: engine
-    yield
-    app.dependency_overrides.clear()
-    engine.dispose()
-
-
-def test_ready_returns_ok_when_db_up(live_database):
-    response = client.get("/healthz/ready")
+def test_ready_returns_ok_when_db_up(db_client):
+    response = db_client.get("/healthz/ready")
 
     assert response.status_code == 200
     assert response.json() == {"status": "ok"}
