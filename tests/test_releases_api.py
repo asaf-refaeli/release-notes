@@ -30,6 +30,14 @@ def test_create_release_rejects_unknown_field(db_client):
     assert response.status_code == 422
 
 
+def test_create_release_rejects_nul_character(db_client):
+    response = db_client.post(
+        "/api/releases", json={"version": "1.0.0", "description": "a\u0000b"}
+    )
+
+    assert response.status_code == 422
+
+
 def test_list_releases_newest_first(db_client):
     for version in ("1.0.0", "1.1.0", "1.2.0"):
         db_client.post("/api/releases", json={"version": version})
@@ -55,6 +63,12 @@ def test_list_releases_rejects_limit_over_100(db_client):
     assert response.status_code == 422
 
 
+def test_list_releases_rejects_offset_too_big_for_postgres(db_client):
+    response = db_client.get("/api/releases?offset=99999999999999999999")
+
+    assert response.status_code == 422
+
+
 def test_get_release_returns_it(db_client):
     created = db_client.post("/api/releases", json={"version": "1.4.0"}).json()
 
@@ -73,5 +87,11 @@ def test_get_unknown_release_returns_404(db_client):
 
 def test_get_non_integer_id_returns_422(db_client):
     response = db_client.get("/api/releases/abc")
+
+    assert response.status_code == 422
+
+
+def test_get_id_too_big_for_postgres_returns_422(db_client):
+    response = db_client.get("/api/releases/99999999999999999999")
 
     assert response.status_code == 422

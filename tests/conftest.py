@@ -41,5 +41,6 @@ def db_client(test_engine):
     with test_engine.begin() as connection:
         connection.execute(text(f"TRUNCATE {tables} RESTART IDENTITY CASCADE"))
     app.dependency_overrides[get_engine] = lambda: test_engine
-    yield TestClient(app)
-    app.dependency_overrides.clear()
+    with TestClient(app) as client:
+        yield client
+    app.dependency_overrides.pop(get_engine, None)
