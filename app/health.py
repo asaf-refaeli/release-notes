@@ -2,11 +2,11 @@ import logging
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Response
-from sqlalchemy import Engine, text
+from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 
 from app.config import Settings, get_settings
-from app.db import get_engine
+from app.db import EngineDep
 
 logger = logging.getLogger(__name__)
 
@@ -19,9 +19,7 @@ async def live() -> dict[str, str]:
 
 
 @router.get("/healthz/ready")
-def ready(
-    response: Response, engine: Annotated[Engine, Depends(get_engine)]
-) -> dict[str, str]:
+def ready(response: Response, engine: EngineDep) -> dict[str, str]:
     try:
         with engine.connect() as connection:
             connection.execute(text("SELECT 1"))
