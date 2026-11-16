@@ -12,6 +12,3 @@ htmlcov/
 # Local config and secrets
 .env
 .env.*
-
-# Personal Claude Code instructions
-CLAUDE.local.md
