@@ -26,15 +26,17 @@ The container runs `uvicorn` directly (exec-form `CMD`), so it is PID 1 and rece
 ## Architecture
 
 <!-- Planned, update as code lands. -->
-- `app/main.py`: the `app` object, `lifespan` (creates the DB pool at startup, disposes it on shutdown), routers, exception handlers, `/healthz/live`, `/healthz/ready`, `/metrics`, `/api/version`. Settings are validated at import, so bad config stops the process before it serves.
+- `app/main.py`: assembles the app only: the `app` object, `lifespan` (creates the DB pool at startup, disposes it on shutdown), `/metrics`, `include_router`, exception handlers (domain exceptions -> HTTP codes). Settings are validated at import, so bad config stops the process before it serves.
+- `app/health.py`: router for `/healthz/live`, `/healthz/ready`, `/api/version`
 - `app/config.py`: `Settings` from env vars only; `get_settings()` is not cached
 - `app/log_config.py`: JSON logs to stdout; `/healthz/` access lines dropped
-- `app/db.py`: `get_engine()` (one pool per process) and the `get_session` dependency
+- `app/db.py`: `get_engine()` (one pool per process), the `get_session` dependency, and the `EngineDep`/`SessionDep` aliases
 - `app/models.py`: SQLAlchemy models (`Release`, `ReleaseEvent`)
 - `app/schemas.py`: Pydantic request/response models; input models use `extra="forbid"`
 - `app/service.py`: business rules and domain exceptions; no HTTP code here
-- `app/api.py`: `/api/releases` routes; maps exceptions to HTTP codes
-- `migrations/`: Alembic; migrations must be expand-only so old pods keep working during a rollout
+- `app/api.py`: `/api/releases` routes; thin, each calls one service function
+- `migrations/`: Alembic; migrations must be expand-only so old pods keep working during a rollout. `env.py` reads `DATABASE_URL` via `get_settings()`; constraint names follow the naming convention on `Base`.
+- `tests/conftest.py`: shared fixtures: one Postgres container and `alembic upgrade head` per run; `db_client` truncates all tables and points the app at the test DB for each test.
 
 Rules:
 - HTTP errors: `404` unknown release, `409` invalid transition or duplicate published version, `400` publish rule failed, `422` malformed body.
