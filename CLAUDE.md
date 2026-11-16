@@ -51,7 +51,7 @@ Their purpose is to explain why each choice was made.
 
 ## Conventions
 - Commits: Conventional Commits (`feat:`, `fix:`, `test:`, `refactor:`, `ci:`, `chore:`, `docs:`)
-- Tests first: write the failing test, then the code.
+- Every feature ships with its tests in the same commit: write the code, then the tests that cover it.
 - Comments only where the reason isn't obvious. No emojis.
 - Keep changes scoped to the task; propose new tools or dependencies before adding them.
 - If code and docs disagree, fix the code or the doc in the same PR. Never document a bug.
