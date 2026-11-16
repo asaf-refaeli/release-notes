@@ -4,6 +4,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from prometheus_fastapi_instrumentator import Instrumentator
 
+from app.api import router as releases_router
 from app.config import get_settings
 from app.db import get_engine
 from app.health import router as health_router
@@ -25,3 +26,4 @@ instrumentator = Instrumentator(excluded_handlers=["/metrics", "/healthz/.*"])
 instrumentator.instrument(app).expose(app)
 
 app.include_router(health_router)
+app.include_router(releases_router)
