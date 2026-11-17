@@ -5,7 +5,23 @@ from app.models import Release
 from app.schemas import ReleaseCreate
 
 
-class ReleaseNotFound(Exception):
+class DomainError(Exception):
+    """A business rule was broken. main.py maps each subclass to an HTTP status."""
+
+
+class ReleaseNotFound(DomainError):
+    pass
+
+
+class InvalidTransition(DomainError):
+    pass
+
+
+class PublishValidationError(DomainError):
+    pass
+
+
+class DuplicateVersion(DomainError):
     pass
 
 

@@ -10,7 +10,13 @@ from app.config import get_settings
 from app.db import get_engine
 from app.health import router as health_router
 from app.log_config import setup_logging
-from app.service import ReleaseNotFound
+from app.service import (
+    DomainError,
+    DuplicateVersion,
+    InvalidTransition,
+    PublishValidationError,
+    ReleaseNotFound,
+)
 
 setup_logging(get_settings().log_level)
 
@@ -31,6 +37,15 @@ app.include_router(health_router)
 app.include_router(releases_router)
 
 
-@app.exception_handler(ReleaseNotFound)
-async def release_not_found(request: Request, exc: ReleaseNotFound) -> JSONResponse:
-    return JSONResponse(status_code=404, content={"detail": str(exc)})
+STATUS_BY_ERROR: dict[type[DomainError], int] = {
+    ReleaseNotFound: 404,
+    InvalidTransition: 409,
+    PublishValidationError: 400,
+    DuplicateVersion: 409,
+}
+
+
+@app.exception_handler(DomainError)
+async def domain_error(request: Request, exc: DomainError) -> JSONResponse:
+    status_code = STATUS_BY_ERROR[type(exc)]
+    return JSONResponse(status_code=status_code, content={"detail": str(exc)})
