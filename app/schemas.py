@@ -2,7 +2,7 @@ from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from app.models import ReleaseStatus
+from app.models import EventType, ReleaseStatus
 
 
 class ReleaseCreate(BaseModel):
@@ -24,3 +24,12 @@ class ReleaseOut(BaseModel):
     updated_at: datetime
     status: ReleaseStatus
     published_at: datetime | None
+
+
+class EventOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    release_id: int
+    event_type: EventType
+    occurred_at: datetime

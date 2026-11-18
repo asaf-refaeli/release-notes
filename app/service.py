@@ -1,7 +1,7 @@
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.models import Release
+from app.models import EventType, Release, ReleaseEvent
 from app.schemas import ReleaseCreate
 
 
@@ -25,9 +25,16 @@ class DuplicateVersion(DomainError):
     pass
 
 
+def _record_event(session: Session, release_id: int, event_type: EventType) -> None:
+    # No commit here: the caller commits the change and its event together.
+    session.add(ReleaseEvent(release_id=release_id, event_type=event_type))
+
+
 def create_release(session: Session, data: ReleaseCreate) -> Release:
     release = Release(version=data.version, description=data.description)
     session.add(release)
+    session.flush()  # sends the INSERT so Postgres assigns release.id; not committed
+    _record_event(session, release.id, EventType.CREATED)
     session.commit()
     session.refresh(release)
     return release
@@ -48,3 +55,13 @@ def get_release(session: Session, release_id: int) -> Release:
     if release is None:
         raise ReleaseNotFound(f"Release {release_id} not found")
     return release
+
+
+def list_events(session: Session, release_id: int) -> list[ReleaseEvent]:
+    get_release(session, release_id)  # 404 for an unknown release, not an empty list
+    statement = (
+        select(ReleaseEvent)
+        .where(ReleaseEvent.release_id == release_id)
+        .order_by(ReleaseEvent.id)  # ids follow insert order; occurred_at may not
+    )
+    return list(session.scalars(statement))
