@@ -10,6 +10,14 @@ def create_draft(client, version="1.0.0", description="first release"):
     return response.json()
 
 
+def create_published(client, version="1.0.0"):
+    release = create_draft(client, version=version)
+    response = client.post(f"/api/releases/{release['id']}/publish")
+    # Fail here, in setup, if publish broke; not later with a misleading 409.
+    assert response.status_code == 200
+    return response.json()
+
+
 def event_types(client, release_id):
     events = client.get(f"/api/releases/{release_id}/events").json()
     return [e["event_type"] for e in events]
@@ -90,18 +98,15 @@ def test_publish_sets_status_and_server_timestamp(db_client):
 
 
 def test_publish_twice_returns_409(db_client):
-    release = create_draft(db_client)
-    url = f"/api/releases/{release['id']}/publish"
-    db_client.post(url)
+    release = create_published(db_client)
 
-    response = db_client.post(url)
+    response = db_client.post(f"/api/releases/{release['id']}/publish")
 
     assert response.status_code == 409
 
 
 def test_edit_published_returns_409(db_client):
-    release = create_draft(db_client)
-    db_client.post(f"/api/releases/{release['id']}/publish")
+    release = create_published(db_client)
 
     response = db_client.patch(
         f"/api/releases/{release['id']}", json={"description": "changed"}
@@ -145,11 +150,6 @@ def test_publish_id_too_big_returns_422(db_client):
     assert response.status_code == 422
 
 
-def create_published(client, version="1.0.0"):
-    release = create_draft(client, version=version)
-    return client.post(f"/api/releases/{release['id']}/publish").json()
-
-
 def test_archive_published_ok(db_client):
     release = create_published(db_client)
 
@@ -172,7 +172,7 @@ def test_archive_draft_returns_409(db_client):
 def test_archive_twice_returns_409(db_client):
     release = create_published(db_client)
     url = f"/api/releases/{release['id']}/archive"
-    db_client.post(url)
+    assert db_client.post(url).status_code == 200
 
     response = db_client.post(url)
 
@@ -182,11 +182,12 @@ def test_archive_twice_returns_409(db_client):
 def test_archived_release_is_final(db_client):
     release = create_published(db_client)
     url = f"/api/releases/{release['id']}"
-    db_client.post(f"{url}/archive")
+    assert db_client.post(f"{url}/archive").status_code == 200
 
     assert db_client.patch(url, json={"description": "changed"}).status_code == 409
     assert db_client.post(f"{url}/publish").status_code == 409
-    assert event_types(db_client, release["id"])[-1] == "ARCHIVED"
+    assert db_client.get(url).json()["description"] == "first release"
+    assert event_types(db_client, release["id"]) == ["CREATED", "PUBLISHED", "ARCHIVED"]
 
 
 @pytest.mark.parametrize(
@@ -203,5 +204,5 @@ def test_actions_on_unknown_id_return_404(db_client, method, url):
     response = db_client.request(method, url, json={"description": "x"})
 
     assert response.status_code == 404
-    # Our message, not FastAPI's "Not Found" for a route that does not exist.
+    # The service's message, not FastAPI's "Not Found" for a route that does not exist.
     assert response.json()["detail"] == "Release 999 not found"
