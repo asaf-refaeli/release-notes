@@ -98,6 +98,21 @@ def publish_release(session: Session, release_id: int) -> Release:
     return release
 
 
+def archive_release(session: Session, release_id: int) -> Release:
+    release = _lock_release(session, release_id)
+    if release.status != ReleaseStatus.PUBLISHED:
+        raise InvalidTransition(
+            f"Release {release_id} is {release.status}; "
+            "only published releases can be archived"
+        )
+    # published_at is kept: an archived release was published at that time.
+    release.status = ReleaseStatus.ARCHIVED
+    _record_event(session, release.id, EventType.ARCHIVED)
+    session.commit()
+    session.refresh(release)
+    return release
+
+
 def list_releases(session: Session, limit: int, offset: int) -> list[Release]:
     statement = (
         select(Release)

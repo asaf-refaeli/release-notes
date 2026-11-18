@@ -46,6 +46,11 @@ def publish(release_id: ReleaseId, session: SessionDep) -> Release:
     return service.publish_release(session, release_id)
 
 
+@router.post("/{release_id}/archive", response_model=ReleaseOut)
+def archive(release_id: ReleaseId, session: SessionDep) -> Release:
+    return service.archive_release(session, release_id)
+
+
 @router.get("/{release_id}/events", response_model=list[EventOut])
 def list_events(release_id: ReleaseId, session: SessionDep) -> list[ReleaseEvent]:
     return service.list_events(session, release_id)
