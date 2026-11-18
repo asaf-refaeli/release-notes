@@ -1,4 +1,5 @@
-from sqlalchemy import select
+from sqlalchemy import func, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.models import EventType, Release, ReleaseEvent, ReleaseStatus
@@ -56,13 +57,43 @@ def update_release(session: Session, release_id: int, data: ReleaseUpdate) -> Re
         raise InvalidTransition(
             f"Release {release_id} is {release.status}; only drafts can be edited"
         )
-    changes = data.model_dump(exclude_none=True)  # null = not sent
+    sent = data.model_dump(exclude_none=True)  # null = not sent
+    # Keep only real changes, so a same-value PATCH writes no UPDATED event.
+    changes = {f: v for f, v in sent.items() if getattr(release, f) != v}
     if not changes:
-        return release  # nothing to change, so no UPDATED event
+        session.rollback()  # nothing to save; ends the transaction, frees the row lock
+        return release  # no UPDATED event
     for field, value in changes.items():
         setattr(release, field, value)
     _record_event(session, release.id, EventType.UPDATED)
     session.commit()
+    session.refresh(release)
+    return release
+
+
+def publish_release(session: Session, release_id: int) -> Release:
+    release = _lock_release(session, release_id)
+    if release.status != ReleaseStatus.DRAFT:
+        raise InvalidTransition(
+            f"Release {release_id} is {release.status}; only drafts can be published"
+        )
+    if not release.description.strip():
+        raise PublishValidationError("A release needs a description to be published")
+    version = release.version  # read now: after a rollback the object is expired
+    release.status = ReleaseStatus.PUBLISHED
+    release.published_at = func.now()  # set by the DB clock, not the client or the pod
+    _record_event(session, release.id, EventType.PUBLISHED)
+    try:
+        session.commit()
+    except IntegrityError as exc:
+        # The row lock covers one release; two drafts with the same version are two
+        # rows. The partial unique index is what stops the second publish.
+        if exc.orig.diag.constraint_name != "uq_releases_version_published":
+            raise
+        session.rollback()
+        raise DuplicateVersion(
+            f"Version {version} is already used by a published or archived release"
+        ) from exc
     session.refresh(release)
     return release
 

@@ -40,6 +40,12 @@ def update(release_id: ReleaseId, data: ReleaseUpdate, session: SessionDep) -> R
     return service.update_release(session, release_id, data)
 
 
+# No body parameter: the client cannot send published_at; any body is ignored.
+@router.post("/{release_id}/publish", response_model=ReleaseOut)
+def publish(release_id: ReleaseId, session: SessionDep) -> Release:
+    return service.publish_release(session, release_id)
+
+
 @router.get("/{release_id}/events", response_model=list[EventOut])
 def list_events(release_id: ReleaseId, session: SessionDep) -> list[ReleaseEvent]:
     return service.list_events(session, release_id)
