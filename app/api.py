@@ -5,7 +5,7 @@ from fastapi import APIRouter, Path, Query
 from app import service
 from app.db import SessionDep
 from app.models import Release, ReleaseEvent
-from app.schemas import EventOut, ReleaseCreate, ReleaseOut
+from app.schemas import EventOut, ReleaseCreate, ReleaseOut, ReleaseUpdate
 
 router = APIRouter(prefix="/api/releases", tags=["releases"])
 
@@ -33,6 +33,11 @@ def list_all(
 @router.get("/{release_id}", response_model=ReleaseOut)
 def get_one(release_id: ReleaseId, session: SessionDep) -> Release:
     return service.get_release(session, release_id)
+
+
+@router.patch("/{release_id}", response_model=ReleaseOut)
+def update(release_id: ReleaseId, data: ReleaseUpdate, session: SessionDep) -> Release:
+    return service.update_release(session, release_id, data)
 
 
 @router.get("/{release_id}/events", response_model=list[EventOut])
