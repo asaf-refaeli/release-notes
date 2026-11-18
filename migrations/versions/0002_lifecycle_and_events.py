@@ -14,8 +14,8 @@ depends_on = None
 
 
 def upgrade() -> None:
-    # Expand-only: the default makes existing rows DRAFT, and old code that does not
-    # know these columns can still insert releases.
+    # Expand-only: old code that does not know these columns can still insert
+    # releases; the default makes every new release a DRAFT.
     op.add_column(
         "releases",
         sa.Column("status", sa.Text(), nullable=False, server_default="DRAFT"),
@@ -66,13 +66,6 @@ def upgrade() -> None:
     )
     op.create_index(
         op.f("ix_release_events_release_id"), "release_events", ["release_id"]
-    )
-
-    # Releases created before this migration get a CREATED event, so every release
-    # has a history.
-    op.execute(
-        "INSERT INTO release_events (release_id, event_type, occurred_at) "
-        "SELECT id, 'CREATED', created_at FROM releases"
     )
 
 
