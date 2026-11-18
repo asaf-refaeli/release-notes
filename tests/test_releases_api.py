@@ -18,6 +18,14 @@ def test_create_release_saves_to_database(db_client, test_engine):
     assert row.created_at is not None
 
 
+def test_new_release_is_draft(db_client):
+    response = db_client.post("/api/releases", json={"version": "1.0.0"})
+
+    assert response.status_code == 201
+    assert response.json()["status"] == "DRAFT"
+    assert response.json()["published_at"] is None
+
+
 def test_create_release_rejects_bad_version(db_client):
     response = db_client.post("/api/releases", json={"version": "1.2"})
 

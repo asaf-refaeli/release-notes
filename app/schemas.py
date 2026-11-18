@@ -20,3 +20,5 @@ class ReleaseOut(BaseModel):
     description: str
     created_at: datetime
     updated_at: datetime
+    status: str
+    published_at: datetime | None
