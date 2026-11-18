@@ -1,5 +1,7 @@
 from datetime import datetime
 
+import pytest
+
 
 def create_draft(client, version="1.0.0", description="first release"):
     response = client.post(
@@ -141,3 +143,65 @@ def test_publish_id_too_big_returns_422(db_client):
     response = db_client.post("/api/releases/99999999999999999999/publish")
 
     assert response.status_code == 422
+
+
+def create_published(client, version="1.0.0"):
+    release = create_draft(client, version=version)
+    return client.post(f"/api/releases/{release['id']}/publish").json()
+
+
+def test_archive_published_ok(db_client):
+    release = create_published(db_client)
+
+    response = db_client.post(f"/api/releases/{release['id']}/archive")
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "ARCHIVED"
+    assert response.json()["published_at"] == release["published_at"]
+    assert event_types(db_client, release["id"]) == ["CREATED", "PUBLISHED", "ARCHIVED"]
+
+
+def test_archive_draft_returns_409(db_client):
+    release = create_draft(db_client)
+
+    response = db_client.post(f"/api/releases/{release['id']}/archive")
+
+    assert response.status_code == 409
+
+
+def test_archive_twice_returns_409(db_client):
+    release = create_published(db_client)
+    url = f"/api/releases/{release['id']}/archive"
+    db_client.post(url)
+
+    response = db_client.post(url)
+
+    assert response.status_code == 409
+
+
+def test_archived_release_is_final(db_client):
+    release = create_published(db_client)
+    url = f"/api/releases/{release['id']}"
+    db_client.post(f"{url}/archive")
+
+    assert db_client.patch(url, json={"description": "changed"}).status_code == 409
+    assert db_client.post(f"{url}/publish").status_code == 409
+    assert event_types(db_client, release["id"])[-1] == "ARCHIVED"
+
+
+@pytest.mark.parametrize(
+    ("method", "url"),
+    [
+        ("post", "/api/releases/999/publish"),
+        ("post", "/api/releases/999/archive"),
+        ("patch", "/api/releases/999"),
+        ("get", "/api/releases/999/events"),
+    ],
+)
+def test_actions_on_unknown_id_return_404(db_client, method, url):
+    # The body is needed only by PATCH (to pass validation); the others ignore it.
+    response = db_client.request(method, url, json={"description": "x"})
+
+    assert response.status_code == 404
+    # Our message, not FastAPI's "Not Found" for a route that does not exist.
+    assert response.json()["detail"] == "Release 999 not found"
