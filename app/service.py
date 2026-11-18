@@ -57,9 +57,12 @@ def update_release(session: Session, release_id: int, data: ReleaseUpdate) -> Re
         raise InvalidTransition(
             f"Release {release_id} is {release.status}; only drafts can be edited"
         )
-    changes = data.model_dump(exclude_none=True)  # null = not sent
+    sent = data.model_dump(exclude_none=True)  # null = not sent
+    # Keep only real changes, so a same-value PATCH writes no UPDATED event.
+    changes = {f: v for f, v in sent.items() if getattr(release, f) != v}
     if not changes:
-        return release  # nothing to change, so no UPDATED event
+        session.rollback()  # nothing to save; ends the transaction, frees the row lock
+        return release  # no UPDATED event
     for field, value in changes.items():
         setattr(release, field, value)
     _record_event(session, release.id, EventType.UPDATED)
@@ -88,7 +91,9 @@ def publish_release(session: Session, release_id: int) -> Release:
         if exc.orig.diag.constraint_name != "uq_releases_version_published":
             raise
         session.rollback()
-        raise DuplicateVersion(f"Version {version} is already published") from exc
+        raise DuplicateVersion(
+            f"Version {version} is already used by a published or archived release"
+        ) from exc
     session.refresh(release)
     return release
 

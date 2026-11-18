@@ -17,10 +17,12 @@ def test_patch_draft_updates_fields(db_client):
     release = create_draft(db_client)
 
     response = db_client.patch(
-        f"/api/releases/{release['id']}", json={"description": "new"}
+        f"/api/releases/{release['id']}",
+        json={"version": "1.0.1", "description": "new"},
     )
 
     assert response.status_code == 200
+    assert response.json()["version"] == "1.0.1"
     assert response.json()["description"] == "new"
     assert event_types(db_client, release["id"]) == ["CREATED", "UPDATED"]
 
@@ -43,6 +45,18 @@ def test_patch_null_field_is_ignored(db_client):
 
     assert response.status_code == 200
     assert response.json()["description"] == "first release"
+    assert event_types(db_client, release["id"]) == ["CREATED"]
+
+
+def test_patch_same_value_writes_no_event(db_client):
+    release = create_draft(db_client)
+
+    response = db_client.patch(
+        f"/api/releases/{release['id']}", json={"description": "first release"}
+    )
+
+    assert response.status_code == 200
+    assert response.json()["updated_at"] == release["updated_at"]
     assert event_types(db_client, release["id"]) == ["CREATED"]
 
 
@@ -118,6 +132,7 @@ def test_publish_duplicate_version_returns_409(db_client):
     response = db_client.post(f"/api/releases/{second['id']}/publish")
 
     assert response.status_code == 409
+    assert "published or archived" in response.json()["detail"]
     assert db_client.get(f"/api/releases/{second['id']}").json()["status"] == "DRAFT"
     assert event_types(db_client, second["id"]) == ["CREATED"]
 
