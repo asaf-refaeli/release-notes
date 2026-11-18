@@ -1,4 +1,5 @@
-from sqlalchemy import select
+from sqlalchemy import func, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.models import EventType, Release, ReleaseEvent, ReleaseStatus
@@ -63,6 +64,31 @@ def update_release(session: Session, release_id: int, data: ReleaseUpdate) -> Re
         setattr(release, field, value)
     _record_event(session, release.id, EventType.UPDATED)
     session.commit()
+    session.refresh(release)
+    return release
+
+
+def publish_release(session: Session, release_id: int) -> Release:
+    release = _lock_release(session, release_id)
+    if release.status != ReleaseStatus.DRAFT:
+        raise InvalidTransition(
+            f"Release {release_id} is {release.status}; only drafts can be published"
+        )
+    if not release.description.strip():
+        raise PublishValidationError("A release needs a description to be published")
+    version = release.version  # read now: after a rollback the object is expired
+    release.status = ReleaseStatus.PUBLISHED
+    release.published_at = func.now()  # set by the DB clock, not the client or the pod
+    _record_event(session, release.id, EventType.PUBLISHED)
+    try:
+        session.commit()
+    except IntegrityError as exc:
+        # The row lock covers one release; two drafts with the same version are two
+        # rows. The partial unique index is what stops the second publish.
+        if exc.orig.diag.constraint_name != "uq_releases_version_published":
+            raise
+        session.rollback()
+        raise DuplicateVersion(f"Version {version} is already published") from exc
     session.refresh(release)
     return release
 
