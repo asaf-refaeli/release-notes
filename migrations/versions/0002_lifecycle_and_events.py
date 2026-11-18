@@ -77,8 +77,7 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    op.drop_index(op.f("ix_release_events_release_id"), table_name="release_events")
-    op.drop_table("release_events")
+    op.drop_table("release_events")  # also drops its indexes and constraints
     op.drop_index(op.f("uq_releases_version_published"), table_name="releases")
     op.drop_constraint(
         op.f("ck_releases_published_at_matches_status"), "releases", type_="check"

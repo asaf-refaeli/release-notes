@@ -2,6 +2,8 @@ from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from app.models import ReleaseStatus
+
 
 class ReleaseCreate(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -20,5 +22,5 @@ class ReleaseOut(BaseModel):
     description: str
     created_at: datetime
     updated_at: datetime
-    status: str
+    status: ReleaseStatus
     published_at: datetime | None
