@@ -26,9 +26,10 @@ Planned, not built yet (move each line up when its step lands):
 
 - `app/main.py`: assembles the app only: the `app` object, `lifespan` (creates the DB pool at startup, disposes it on shutdown), `/metrics`, `include_router`, exception handlers (domain exceptions -> HTTP codes). Settings are validated at import, so bad config stops the process before it serves.
 - `app/health.py`: router for `/healthz/live`, `/healthz/ready`, `/api/version`
-- `app/config.py`: `Settings` from env vars only; `get_settings()` is not cached
+- `app/config.py`: `Settings` from env vars only; `get_settings()` is not cached. Includes `DB_POOL_SIZE` (5) and `DB_MAX_OVERFLOW` (10).
 - `app/log_config.py`: JSON logs to stdout; `/healthz/` access lines dropped
-- `app/db.py`: `get_engine()` (one pool per process), the `get_session` dependency, and the `EngineDep`/`SessionDep` aliases
+- `app/db.py`: `get_engine()` (one pool per process, sized from Settings, wires the pool gauges), SQL timing hooks on every engine, the `get_session` dependency, and the `EngineDep`/`SessionDep` aliases
+- `app/metrics.py`: every app metric, defined once (`db_pool_checked_out`, `db_pool_max_connections`, `db_query_duration_seconds`, `release_lock_wait_seconds`); `http_requests_inprogress` comes from the instrumentator in `main.py`
 - `app/models.py`: SQLAlchemy models (`Release`; `ReleaseEvent` comes in step 3)
 - `app/schemas.py`: Pydantic request/response models; input models use `extra="forbid"`
 - `app/service.py`: business rules and domain exceptions; no HTTP code here

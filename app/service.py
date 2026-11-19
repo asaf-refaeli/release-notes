@@ -36,6 +36,7 @@ def _lock_release(session: Session, release_id: int) -> Release:
     # SELECT ... FOR UPDATE: other writers of this row wait until this transaction ends,
     # so the status checked below cannot change before the commit.
     statement = select(Release).where(Release.id == release_id).with_for_update()
+    session.connection()  # get a pool connection first, so the timer sees only the lock
     with LOCK_WAIT.time():  # waits here while another request holds the lock
         release = session.scalars(statement).one_or_none()
     if release is None:

@@ -28,6 +28,15 @@ def _stop_query_timer(conn, cursor, statement, parameters, context, executemany)
     DB_QUERY_DURATION.observe(time.perf_counter() - started)
 
 
+# A failed statement skips after_cursor_execute. Record it here, so slow failures
+# (timeouts, lock errors) are still counted and no start time is left behind.
+@event.listens_for(Engine, "handle_error")
+def _stop_query_timer_on_error(context):
+    starts = context.connection.info.get("query_start") if context.connection else None
+    if starts:
+        DB_QUERY_DURATION.observe(time.perf_counter() - starts.pop())
+
+
 @lru_cache
 def get_engine() -> Engine:
     settings = get_settings()
@@ -38,8 +47,9 @@ def get_engine() -> Engine:
         max_overflow=settings.db_max_overflow,
         connect_args={"connect_timeout": 2},
     )
-    # Called at each scrape, so the value is current when Prometheus asks.
-    DB_POOL_CHECKED_OUT.set_function(engine.pool.checkedout)
+    # Called at each scrape. A lambda reads engine.pool fresh each time, because
+    # engine.dispose() replaces the pool object.
+    DB_POOL_CHECKED_OUT.set_function(lambda: engine.pool.checkedout())
     DB_POOL_MAX_CONNECTIONS.set(settings.db_pool_size + settings.db_max_overflow)
     return engine
 
