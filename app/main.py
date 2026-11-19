@@ -30,7 +30,11 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
 
 app = FastAPI(lifespan=lifespan)
 
-instrumentator = Instrumentator(excluded_handlers=["/metrics", "/healthz/.*"])
+instrumentator = Instrumentator(
+    excluded_handlers=["/metrics", "/healthz/.*"],
+    # Requests handled right now; near 40 means the thread pool is full (ADR-0004).
+    should_instrument_requests_inprogress=True,
+)
 instrumentator.instrument(app).expose(app)
 
 app.include_router(health_router)

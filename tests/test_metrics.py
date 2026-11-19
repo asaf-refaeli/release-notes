@@ -39,3 +39,10 @@ def test_lock_wait_is_observed(db_client):
 
     after = REGISTRY.get_sample_value("release_lock_wait_seconds_count")
     assert after == before + 1
+
+
+def test_requests_in_progress_is_exposed(db_client):
+    db_client.get("/api/releases")
+
+    # One total per pod (no labels): compared against the 40 threads.
+    assert "\nhttp_requests_inprogress " in db_client.get("/metrics").text
