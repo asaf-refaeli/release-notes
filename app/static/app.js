@@ -303,7 +303,9 @@ async function saveRelease(event) {
   event.preventDefault();
   if (!validateForm()) return;
   const body = { version: versionInput.value.trim(), description: descriptionInput.value };
-  if (editing && body.version === editing.version && body.description === editing.description) {
+  // A textarea turns \r\n into \n, so compare with the same line breaks.
+  const savedDescription = editing?.description.replaceAll("\r\n", "\n");
+  if (editing && body.version === editing.version && body.description === savedDescription) {
     dialog.close(); // nothing to send; the API would not record an event either
     showToast("No changes to save", "info");
     return;
