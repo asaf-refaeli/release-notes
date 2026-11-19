@@ -247,7 +247,16 @@ tr.selected .chip {
 .date {
   color: var(--muted);
   font-size: 0.875rem;
+  line-height: 1.3;
   white-space: nowrap;
+}
+
+.date span {
+  display: block;
+}
+
+.date .time {
+  font-size: 0.8rem;
 }
 
 #empty {

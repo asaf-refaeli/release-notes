@@ -59,6 +59,10 @@ function formatDay(iso) {
   return new Date(iso).toLocaleDateString(undefined, { dateStyle: "medium" });
 }
 
+function formatTime(iso) {
+  return new Date(iso).toLocaleTimeString(undefined, { timeStyle: "short" });
+}
+
 function badge(status) {
   return element("span", "badge " + status.toLowerCase(), status.toLowerCase());
 }
@@ -141,6 +145,12 @@ function renderRelease(release) {
   versionCell.append(element("span", "chip", release.version));
   const statusCell = element("td");
   statusCell.append(badge(release.status));
+  // Date on top, time under it: the column stays narrow.
+  const createdCell = element("td", "date");
+  createdCell.append(
+    element("span", "day", formatDay(release.created_at)),
+    element("span", "time", formatTime(release.created_at)),
+  );
 
   const row = element("tr", release.id === selectedId ? "selected" : "");
   row.dataset.id = release.id;
@@ -149,7 +159,7 @@ function renderRelease(release) {
     versionCell,
     element("td", "description", release.description),
     statusCell,
-    element("td", "date", formatDay(release.created_at)),
+    createdCell,
     rowActions(release),
   );
   row.addEventListener("click", () => showRelease(release));
