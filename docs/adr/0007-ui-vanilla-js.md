@@ -30,4 +30,6 @@ Security, set in `app/ui.py` and pinned by tests:
 - Bad: pytest cannot run JavaScript. Tests cover serving, headers and static rules (no HTML writes, no inline code, every element id `app.js` looks up exists in `index.html`); the behaviour is checked by hand in a browser.
 - Bad: `/docs` and `/redoc` are exempt from the CSP, because Swagger UI loads from a CDN and runs an inline script.
 - Bad: the page shows the first 100 releases (the API's page limit); there is no paging yet.
+- Bad: the files have fixed names (`/app.js`, `/app.css`), so during a rolling update one page load can get `index.html` from a new pod and `app.js` from an old one. Rule until that is solved: keep element ids stable across a release (a renamed id would break the page for that load). The usual fix is content-hashed file names (`app.3f9c1a.js`) referenced from `index.html`, which needs a build step.
+- Not changed: the security headers use FastAPI's `@app.middleware("http")` (Starlette's `BaseHTTPMiddleware`), the documented way to add headers. A raw ASGI middleware would skip a small per-request wrapper; at this scale the difference is not measurable, so readability wins.
 - Next steps: Playwright end-to-end tests in CI; htmx if the UI grows into several screens.
