@@ -230,6 +230,12 @@ tbody tr:focus-visible {
   font-family: var(--mono);
   font-size: 0.875rem;
   white-space: nowrap;
+  /* A long version (up to 32 characters) is cut with "…" instead of covering the next column. */
+  display: inline-block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  vertical-align: middle;
 }
 
 tbody tr:hover .chip,
@@ -355,6 +361,7 @@ tr.selected .chip {
   font-family: var(--mono);
   font-size: 1.5rem;
   font-weight: 700;
+  overflow-wrap: anywhere; /* the full version, on two lines if needed */
 }
 
 /* Full text with the line breaks the user typed. */

@@ -142,7 +142,9 @@ function rowActions(release) {
 
 function renderRelease(release) {
   const versionCell = element("td");
-  versionCell.append(element("span", "chip", release.version));
+  const chip = element("span", "chip", release.version);
+  chip.title = release.version; // hover shows the full version when it is cut
+  versionCell.append(chip);
   const statusCell = element("td");
   statusCell.append(badge(release.status));
   // Date on top, time under it: the column stays narrow.
