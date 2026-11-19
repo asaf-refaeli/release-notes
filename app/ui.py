@@ -12,8 +12,8 @@ CONTENT_SECURITY_POLICY = (
 )
 
 # Swagger UI loads its JS and CSS from a CDN and runs an inline script,
-# which the policy above would block.
-DOCS_PATHS = ("/docs", "/redoc")
+# which the policy above would block. Exact paths, so nothing else skips the CSP.
+DOCS_PATHS = {"/docs", "/docs/oauth2-redirect", "/redoc"}
 
 
 async def security_headers(
@@ -22,6 +22,6 @@ async def security_headers(
     response = await call_next(request)
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["Cache-Control"] = "no-cache"
-    if not request.url.path.startswith(DOCS_PATHS):
+    if request.url.path not in DOCS_PATHS:
         response.headers["Content-Security-Policy"] = CONTENT_SECURITY_POLICY
     return response

@@ -1,5 +1,6 @@
 import re
 
+import pytest
 from fastapi.testclient import TestClient
 
 from app.main import app
@@ -24,6 +25,14 @@ def test_docs_has_no_csp():
 
     assert response.status_code == 200
     assert "content-security-policy" not in response.headers
+
+
+@pytest.mark.parametrize("path", ["/docs-guide", "/redocumentation", "/docs/other"])
+def test_csp_exemption_is_only_the_docs_pages(path):
+    # Only the exact Swagger/ReDoc pages skip the CSP, not paths that look like them
+    response = client.get(path)
+
+    assert response.headers["content-security-policy"] == CONTENT_SECURITY_POLICY
 
 
 def test_unknown_path_returns_404():
