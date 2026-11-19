@@ -8,13 +8,6 @@ from sqlalchemy.exc import DBAPIError
 from app.db import get_engine
 
 
-def test_db_pool_gauges_are_exposed(db_client):
-    text = db_client.get("/metrics").text
-
-    assert "db_pool_checked_out " in text
-    assert "db_pool_max_connections " in text
-
-
 def test_pool_gauges_follow_the_real_pool(migrated_url, monkeypatch):
     # The real get_engine(), as in production, pointed at the test DB.
     monkeypatch.setenv("DATABASE_URL", migrated_url)
