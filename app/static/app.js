@@ -41,6 +41,7 @@ const EVENT_TEXT = {
 let editing = null; // the draft open in the dialog, or null when creating
 let selectedId = null; // the release shown in the panel
 let toastTimer = null;
+let saving = false; // a save is waiting for the server: the dialog must stay open
 let listRequest = 0; // counts list reloads; only the newest one may draw the table
 
 // ---------- small helpers ----------
@@ -265,6 +266,7 @@ async function loadHistory(release) {
 // ---------- the New/Edit dialog ----------
 
 function openDialog(release) {
+  clearErrors();
   editing = release;
   dialogTitle.textContent = release ? "Edit draft " + release.version : "New release";
   saveButton.textContent = release ? "Save changes" : "Create draft";
@@ -326,10 +328,15 @@ async function saveRelease(event) {
     showToast("No changes to save", "info");
     return;
   }
-  saveButton.disabled = true; // a double-click sends one request
+  // Keep the dialog open until the answer arrives: Save is disabled (one request per
+  // double-click), Cancel too, and Esc is ignored (see the "cancel" listener below).
+  const draft = editing; // the close handler resets `editing`, so keep a copy for this save
+  saving = true;
+  saveButton.disabled = true;
+  cancelButton.disabled = true;
   try {
-    const response = await fetch(editing ? `/api/releases/${editing.id}` : "/api/releases", {
-      method: editing ? "PATCH" : "POST",
+    const response = await fetch(draft ? `/api/releases/${draft.id}` : "/api/releases", {
+      method: draft ? "PATCH" : "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
     });
@@ -339,7 +346,7 @@ async function saveRelease(event) {
       return;
     }
     const saved = await response.json();
-    const message = editing ? `Draft ${saved.version} saved` : `Draft ${saved.version} created`;
+    const message = draft ? `Draft ${saved.version} saved` : `Draft ${saved.version} created`;
     dialog.close();
     selectedId = saved.id;
     showToast(message, "success");
@@ -347,7 +354,9 @@ async function saveRelease(event) {
   } catch {
     formError.textContent = "Cannot reach the server";
   } finally {
+    saving = false;
     saveButton.disabled = false;
+    cancelButton.disabled = false;
   }
 }
 
@@ -372,6 +381,10 @@ async function runAction(release, action) {
 
 newButton.addEventListener("click", () => openDialog(null));
 cancelButton.addEventListener("click", () => dialog.close());
+// Esc fires "cancel" before closing; ignore it while a save is in flight.
+dialog.addEventListener("cancel", (event) => {
+  if (saving) event.preventDefault();
+});
 // Cancel, Esc, or after a save: leave nothing behind for the next open.
 dialog.addEventListener("close", () => {
   editing = null;
