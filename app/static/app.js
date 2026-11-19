@@ -268,7 +268,7 @@ function clearErrors() {
   formError.textContent = "";
 }
 
-// Our own messages instead of the browser's "Please fill out this field".
+// Custom messages instead of the browser's "Please fill out this field".
 function validateForm() {
   clearErrors();
   const version = versionInput.value.trim();
