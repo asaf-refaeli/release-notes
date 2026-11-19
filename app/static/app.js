@@ -41,6 +41,7 @@ const EVENT_TEXT = {
 let editing = null; // the draft open in the dialog, or null when creating
 let selectedId = null; // the release shown in the panel
 let toastTimer = null;
+let listRequest = 0; // counts list reloads; only the newest one may draw the table
 
 // ---------- small helpers ----------
 
@@ -176,13 +177,16 @@ function renderRelease(release) {
 }
 
 async function loadReleases() {
+  // Two quick actions start two reloads; an older answer arriving last must not win.
+  const request = ++listRequest;
   try {
     const response = await fetch("/api/releases");
+    const releases = await readJson(response);
+    if (request !== listRequest) return;
     if (!response.ok) {
-      showLoadError(errorMessage(await readJson(response)));
+      showLoadError(errorMessage(releases));
       return;
     }
-    const releases = await response.json();
     tbody.replaceChildren(...releases.map(renderRelease));
     empty.textContent = "No releases yet. Create the first one with New Release.";
     empty.hidden = releases.length > 0;
@@ -190,7 +194,7 @@ async function loadReleases() {
     const selected = releases.find((release) => release.id === selectedId);
     if (selected) await showRelease(selected);
   } catch {
-    showLoadError("Cannot reach the server");
+    if (request === listRequest) showLoadError("Cannot reach the server");
   }
 }
 
