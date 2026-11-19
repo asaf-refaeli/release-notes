@@ -1,3 +1,5 @@
+import re
+
 from fastapi.testclient import TestClient
 
 from app.main import app
@@ -55,3 +57,24 @@ def test_js_never_writes_html():
 
     for sink in ("innerHTML", "outerHTML", "insertAdjacentHTML", "document.write"):
         assert sink not in source
+
+
+def test_html_has_no_inline_code():
+    # The CSP blocks inline scripts, style attributes and on* handlers
+    html = (STATIC_DIR / "index.html").read_text()
+
+    assert re.search(r"<script(?![^>]*\ssrc=)", html) is None
+    assert re.search(r"\sstyle=", html) is None
+    assert re.search(r"\son[a-z]+=", html) is None
+
+
+def test_js_ids_exist_in_html():
+    # An id renamed in only one file silently breaks that part of the page
+    js = (STATIC_DIR / "app.js").read_text()
+    html = (STATIC_DIR / "index.html").read_text()
+
+    used_ids = re.findall(r'querySelector\("#([\w-]+)"\)', js)
+
+    assert used_ids
+    for element_id in used_ids:
+        assert f'id="{element_id}"' in html, element_id
