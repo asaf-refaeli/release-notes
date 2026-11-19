@@ -1,6 +1,6 @@
 """Every app metric, defined once. Other modules import these and record values."""
 
-from prometheus_client import Counter, Gauge, Histogram
+from prometheus_client import Gauge, Histogram
 
 DB_QUERY_DURATION = Histogram(
     "db_query_duration_seconds",
@@ -16,13 +16,6 @@ DB_POOL_MAX_CONNECTIONS = Gauge(
     "db_pool_max_connections",
     "Most DB connections this pod can open (pool size + overflow).",
 )
-
-READINESS_FAILURES = Counter(
-    "readiness_check_failures_total", "Readiness checks that could not reach the DB."
-)
-
-# Always 1; the version label shows which build this pod runs.
-BUILD_INFO = Gauge("app_build_info", "Running app version.", ["version"])
 
 LOCK_WAIT = Histogram(
     "release_lock_wait_seconds",
