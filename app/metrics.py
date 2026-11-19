@@ -17,13 +17,6 @@ DB_POOL_MAX_CONNECTIONS = Gauge(
     "Most DB connections this pod can open (pool size + overflow).",
 )
 
-# Labels stay a small fixed set: never a release id or a version string.
-RELEASE_TRANSITIONS = Counter(
-    "release_transitions_total",
-    "Edit, publish and archive attempts by outcome.",
-    ["action", "result"],
-)
-
 READINESS_FAILURES = Counter(
     "readiness_check_failures_total", "Readiness checks that could not reach the DB."
 )
