@@ -30,7 +30,12 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
 
 app = FastAPI(lifespan=lifespan)
 
-instrumentator = Instrumentator(excluded_handlers=["/metrics", "/healthz/.*"])
+instrumentator = Instrumentator(
+    excluded_handlers=["/metrics", "/healthz/.*"],
+    # Requests in flight (incl. those queued for a thread; /healthz and /metrics
+    # excluded). Staying above ~40 means requests queue for threads (ADR-0004).
+    should_instrument_requests_inprogress=True,
+)
 instrumentator.instrument(app).expose(app)
 
 app.include_router(health_router)
