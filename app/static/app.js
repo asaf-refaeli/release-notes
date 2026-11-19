@@ -193,6 +193,7 @@ async function loadReleases() {
     // Refresh the panel with the new data, so it never shows an old status or history.
     const selected = releases.find((release) => release.id === selectedId);
     if (selected) await showRelease(selected);
+    else resetPanel(); // not in the list any more (e.g. beyond the first 100): show nothing old
   } catch {
     if (request === listRequest) showLoadError("Cannot reach the server");
   }
@@ -200,12 +201,21 @@ async function loadReleases() {
 
 function showLoadError(message) {
   tbody.replaceChildren();
+  resetPanel(); // the list could not be loaded, so the panel's data cannot be trusted either
   empty.textContent = "Could not load releases.";
   empty.hidden = false;
   showToast(message, "error");
 }
 
 // ---------- the panel: description and audit history ----------
+
+function resetPanel() {
+  selectedId = null;
+  panel.classList.add("empty");
+  panelPlaceholder.hidden = false;
+  panelContent.hidden = true;
+  historyEvents.replaceChildren();
+}
 
 async function showRelease(release) {
   // Another release: empty the timeline now, so a failed load never shows the old one.
