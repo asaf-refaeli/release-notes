@@ -204,6 +204,8 @@ function showLoadError(message) {
 // ---------- the panel: description and audit history ----------
 
 async function showRelease(release) {
+  // Another release: empty the timeline now, so a failed load never shows the old one.
+  if (release.id !== selectedId) historyEvents.replaceChildren();
   selectedId = release.id;
   for (const row of tbody.rows) {
     row.classList.toggle("selected", row.dataset.id === String(release.id));
@@ -233,16 +235,16 @@ function renderEvent(auditEvent) {
 async function loadHistory(release) {
   try {
     const response = await fetch(`/api/releases/${release.id}/events`);
+    // Clicked another row while this was loading: its result, good or bad, no longer matters.
+    if (release.id !== selectedId) return;
     if (!response.ok) {
       showToast(errorMessage(await readJson(response)), "error");
       return;
     }
     const events = await response.json();
-    // Clicked another row while this was loading: do not overwrite its history.
-    if (release.id !== selectedId) return;
     historyEvents.replaceChildren(...events.reverse().map(renderEvent)); // newest first
   } catch {
-    showToast("Cannot reach the server", "error");
+    if (release.id === selectedId) showToast("Cannot reach the server", "error");
   }
 }
 
