@@ -24,22 +24,22 @@ Planned, not built yet (move each line up when its step lands):
 
 ## Architecture
 
-- `app/main.py`: assembles the app only: the `app` object, `lifespan` (creates the DB pool at startup, disposes it on shutdown), `/metrics`, `include_router`, exception handlers (domain exceptions -> HTTP codes). Settings are validated at import, so bad config stops the process before it serves.
+- `app/main.py`: assembles the app only: the `app` object, `lifespan` (creates the DB pool at startup, disposes it on shutdown), `/metrics`, `include_router`, one exception handler mapping each domain exception to an HTTP code via `STATUS_BY_ERROR`. Settings are validated at import, so bad config stops the process before it serves.
 - `app/health.py`: router for `/healthz/live`, `/healthz/ready`, `/api/version`
 - `app/config.py`: `Settings` from env vars only; `get_settings()` is not cached. Includes `DB_POOL_SIZE` (5) and `DB_MAX_OVERFLOW` (10).
 - `app/log_config.py`: JSON logs to stdout; `/healthz/` access lines dropped
 - `app/db.py`: `get_engine()` (one pool per process, sized from Settings, wires the pool gauges), SQL timing hooks on every engine, the `get_session` dependency, and the `EngineDep`/`SessionDep` aliases
 - `app/metrics.py`: every app metric, defined once (`db_pool_checked_out`, `db_pool_max_connections`, `db_query_duration_seconds`, `release_lock_wait_seconds`); `http_requests_inprogress` comes from the instrumentator in `main.py`
-- `app/models.py`: SQLAlchemy models (`Release`; `ReleaseEvent` comes in step 3)
+- `app/models.py`: SQLAlchemy models `Release` and `ReleaseEvent` (the audit trail), plus the `ReleaseStatus` and `EventType` enums
 - `app/schemas.py`: Pydantic request/response models; input models use `extra="forbid"`
-- `app/service.py`: business rules and domain exceptions; no HTTP code here
+- `app/service.py`: business rules and the `DomainError` exceptions; `_lock_release` (row lock) and `_record_event` are used by every lifecycle write; no HTTP code here
 - `app/api.py`: `/api/releases` routes; thin, each calls one service function
 - `migrations/`: Alembic; migrations must be expand-only so old pods keep working during a rollout. `env.py` reads `DATABASE_URL` via `get_settings()`; constraint names follow the naming convention on `Base`.
 - `tests/conftest.py`: shared fixtures: one Postgres container and `alembic upgrade head` per run; `db_client` truncates all tables and points the app at the test DB for each test.
 
 Rules:
-- HTTP errors: `404` unknown release, `422` malformed body (built). From step 3: `409` invalid transition or duplicate published version, `400` publish rule failed.
-- From step 3, every lifecycle write is one transaction: `SELECT ... FOR UPDATE` on the release row, check the rule, update, insert the audit event, commit.
+- HTTP errors: `404` unknown release, `422` malformed body, `409` invalid transition or duplicate published version, `400` publish rule failed.
+- Every lifecycle write is one transaction: `SELECT ... FOR UPDATE` on the release row, check the rule, update, insert the audit event, commit (ADR-0005).
 - `/healthz/ready` checks the database; `/healthz/live` never does.
 
 ## Decisions
@@ -48,6 +48,9 @@ Their purpose is to explain why each choice was made.
 - Use GitHub Flow as git workflow
 - Use GitHub Actions for CI
 - Separate GitOps repo (`gitops`); the Helm chart lives in this repo
+- Sync routes with sync SQLAlchemy (ADR-0004)
+- Concurrent writes: row lock plus a partial unique index (ADR-0005)
+- Tests run against a real Postgres through testcontainers (ADR-0006)
 <!-- Add each decision here once it's made. Until something is listed, ask before choosing. -->
 
 ## Conventions
