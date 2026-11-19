@@ -1,3 +1,5 @@
+from prometheus_client import REGISTRY
+
 from app.db import get_engine
 
 
@@ -16,3 +18,12 @@ def test_pool_max_matches_real_pool(db_client):
     text = db_client.get("/metrics").text
 
     assert f"db_pool_max_connections {float(real_max)}" in text
+
+
+def test_db_queries_are_timed(db_client):
+    before = REGISTRY.get_sample_value("db_query_duration_seconds_count")
+
+    db_client.get("/api/releases")  # runs at least one SQL query
+
+    after = REGISTRY.get_sample_value("db_query_duration_seconds_count")
+    assert after > before

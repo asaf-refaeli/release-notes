@@ -1,13 +1,31 @@
+import time
 from collections.abc import Iterator
 from functools import lru_cache
 from typing import Annotated
 
 from fastapi import Depends
-from sqlalchemy import Engine, create_engine
+from sqlalchemy import Engine, create_engine, event
 from sqlalchemy.orm import Session
 
 from app.config import get_settings
-from app.metrics import DB_POOL_CHECKED_OUT, DB_POOL_MAX_CONNECTIONS
+from app.metrics import (
+    DB_POOL_CHECKED_OUT,
+    DB_POOL_MAX_CONNECTIONS,
+    DB_QUERY_DURATION,
+)
+
+
+# Time every SQL statement (SQLAlchemy FAQ recipe). Registered on the Engine class,
+# so it covers every engine, including the one the tests use.
+@event.listens_for(Engine, "before_cursor_execute")
+def _start_query_timer(conn, cursor, statement, parameters, context, executemany):
+    conn.info.setdefault("query_start", []).append(time.perf_counter())
+
+
+@event.listens_for(Engine, "after_cursor_execute")
+def _stop_query_timer(conn, cursor, statement, parameters, context, executemany):
+    started = conn.info["query_start"].pop()
+    DB_QUERY_DURATION.observe(time.perf_counter() - started)
 
 
 @lru_cache
