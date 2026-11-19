@@ -27,3 +27,15 @@ def test_db_queries_are_timed(db_client):
 
     after = REGISTRY.get_sample_value("db_query_duration_seconds_count")
     assert after > before
+
+
+def test_lock_wait_is_observed(db_client):
+    before = REGISTRY.get_sample_value("release_lock_wait_seconds_count")
+    release = db_client.post(
+        "/api/releases", json={"version": "1.0.0", "description": "notes"}
+    ).json()
+
+    db_client.post(f"/api/releases/{release['id']}/publish")  # takes the lock once
+
+    after = REGISTRY.get_sample_value("release_lock_wait_seconds_count")
+    assert after == before + 1

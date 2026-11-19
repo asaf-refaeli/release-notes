@@ -2,6 +2,7 @@ from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from app.metrics import LOCK_WAIT
 from app.models import EventType, Release, ReleaseEvent, ReleaseStatus
 from app.schemas import ReleaseCreate, ReleaseUpdate
 
@@ -35,7 +36,8 @@ def _lock_release(session: Session, release_id: int) -> Release:
     # SELECT ... FOR UPDATE: other writers of this row wait until this transaction ends,
     # so the status checked below cannot change before the commit.
     statement = select(Release).where(Release.id == release_id).with_for_update()
-    release = session.scalars(statement).one_or_none()
+    with LOCK_WAIT.time():  # waits here while another request holds the lock
+        release = session.scalars(statement).one_or_none()
     if release is None:
         raise ReleaseNotFound(f"Release {release_id} not found")
     return release
