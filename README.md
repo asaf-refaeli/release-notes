@@ -2,7 +2,7 @@
 
 A small internal service for recording what shipped in each release: a FastAPI API on Postgres, with a draft → published → archived lifecycle and an audit trail of every change.
 
-> **Status:** home assignment, in progress. Built: the service with health checks, structured logs, metrics, the release lifecycle and the audit trail. Next: the minimal UI, a container image, a Helm chart, CI/CD and a zero-downtime rollout.
+> **Status:** home assignment, in progress. Built: the service with health checks, structured logs, metrics, the release lifecycle, the audit trail and a UI for all of it. Next: a container image, a Helm chart, CI/CD and a zero-downtime rollout.
 
 ## Quickstart
 
@@ -17,7 +17,7 @@ uv run alembic upgrade head
 uv run uvicorn app.main:app --reload
 ```
 
-Then open http://127.0.0.1:8000/docs, or:
+Then open http://127.0.0.1:8000/ for the UI (create, edit, publish and archive releases, and see each release's history), http://127.0.0.1:8000/docs for the API, or:
 
 ```bash
 curl -X POST localhost:8000/api/releases -H 'Content-Type: application/json' \
@@ -40,6 +40,7 @@ curl localhost:8000/api/releases/1/events
 | `GET` | `/healthz/live`, `/healthz/ready` | Liveness (no I/O) and readiness (checks the database) |
 | `GET` | `/api/version` | Running app version |
 | `GET` | `/metrics` | Prometheus metrics |
+| `GET` | `/` | The UI (static files from `app/static/`) |
 
 **Lifecycle rules:** only drafts can be edited or published; only published releases can be archived; an archived release is final. Publishing needs a non-blank description and a version no other published or archived release uses.
 
@@ -87,6 +88,7 @@ Tests run against a real Postgres (testcontainers), including the migrations, co
 
 ```
 app/          FastAPI app: routes (api.py, health.py), rules (service.py), models, settings, metrics
+app/static/   The UI: index.html, app.js, app.css (no build step; security headers in app/ui.py)
 migrations/   Alembic migrations (expand-only, safe during a rolling update)
 tests/        pytest suite
 docs/adr/     Architecture decision records
@@ -102,3 +104,4 @@ docs/adr/     Architecture decision records
 | [0004](docs/adr/0004-request-handling-sync.md) | Sync routes with sync SQLAlchemy |
 | [0005](docs/adr/0005-concurrent-writes.md) | Row lock plus a partial unique index for concurrent writes |
 | [0006](docs/adr/0006-tests-on-real-postgres.md) | Tests run against a real Postgres through testcontainers |
+| [0007](docs/adr/0007-ui-vanilla-js.md) | UI: static files and plain JavaScript on the JSON API, strict CSP |

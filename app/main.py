@@ -17,6 +17,7 @@ from app.service import (
     PublishValidationError,
     ReleaseNotFound,
 )
+from app.ui import STATIC_DIR, security_headers
 
 setup_logging(get_settings().log_level)
 
@@ -40,6 +41,8 @@ instrumentator.instrument(app).expose(app)
 
 app.include_router(health_router)
 app.include_router(releases_router)
+app.middleware("http")(security_headers)
+app.frontend("/", directory=STATIC_DIR, fallback=None)
 
 
 STATUS_BY_ERROR: dict[type[DomainError], int] = {

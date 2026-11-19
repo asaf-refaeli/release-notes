@@ -11,7 +11,7 @@ The plan lives outside this repo in `../docs/project-plan.md`.
 ## Commands
 
 - Install deps: `uv sync` (`uv.lock` is committed)
-- Run: `uv run uvicorn app.main:app --reload` (needs `DATABASE_URL`)
+- Run: `uv run uvicorn app.main:app --reload` (needs `DATABASE_URL`); the UI is at `http://127.0.0.1:8000/`
 - Tests: `uv run pytest` (needs Docker: testcontainers starts a real Postgres)
 - Lint and format: `uv run ruff check . && uv run ruff format --check .`
 - Migrations: `uv run alembic upgrade head` (needs `DATABASE_URL`)
@@ -24,7 +24,9 @@ Planned, not built yet (move each line up when its step lands):
 
 ## Architecture
 
-- `app/main.py`: assembles the app only: the `app` object, `lifespan` (creates the DB pool at startup, disposes it on shutdown), `/metrics`, `include_router`, one exception handler mapping each domain exception to an HTTP code via `STATUS_BY_ERROR`. Settings are validated at import, so bad config stops the process before it serves.
+- `app/main.py`: assembles the app only: the `app` object, `lifespan` (creates the DB pool at startup, disposes it on shutdown), `/metrics`, `include_router`, the `security_headers` middleware, `app.frontend("/", ...)` after the routers (routes match first, then files), one exception handler mapping each domain exception to an HTTP code via `STATUS_BY_ERROR`. Settings are validated at import, so bad config stops the process before it serves.
+- `app/ui.py`: `STATIC_DIR` (built from `__file__`, so any working directory works), `CONTENT_SECURITY_POLICY`, and the `security_headers` middleware (CSP on everything except `/docs` and `/redoc`, plus `nosniff` and `no-cache`)
+- `app/static/`: the UI (ADR-0007): `index.html`, `app.js` (an ES module calling the JSON API), `app.css`, `favicon.svg`. Served with `fallback=None`, so unknown URLs are 404.
 - `app/health.py`: router for `/healthz/live`, `/healthz/ready`, `/api/version`
 - `app/config.py`: `Settings` from env vars only; `get_settings()` is not cached. Includes `DB_POOL_SIZE` (5) and `DB_MAX_OVERFLOW` (10).
 - `app/log_config.py`: JSON logs to stdout; `/healthz/` access lines dropped
@@ -41,6 +43,8 @@ Rules:
 - HTTP errors: `404` unknown release, `422` malformed body, `409` invalid transition or duplicate published version, `400` publish rule failed.
 - Every lifecycle write is one transaction: `SELECT ... FOR UPDATE` on the release row, check the rule, update, insert the audit event, commit (ADR-0005).
 - `/healthz/ready` checks the database; `/healthz/live` never does.
+- API error messages are shown to people as they are: name the version, not the id, and say what to do.
+- UI: user data reaches the page only through `textContent` (never `innerHTML` and similar); no inline `<script>`, `style=` or `on*=` (the CSP blocks them); API URLs in JS are relative; no CDN, no build step. Element ids are the contract between `index.html` and `app.js` (a test checks them).
 
 ## Decisions
 Decisions are documented as ADRs in `docs/adr/` using `docs/adr/0000-template.md` (`DECISIONS.md` index comes in step 0, before CI).
@@ -51,6 +55,7 @@ Their purpose is to explain why each choice was made.
 - Sync routes with sync SQLAlchemy (ADR-0004)
 - Concurrent writes: row lock plus a partial unique index (ADR-0005)
 - Tests run against a real Postgres through testcontainers (ADR-0006)
+- UI: static files and plain JavaScript on the JSON API, strict CSP (ADR-0007)
 <!-- Add each decision here once it's made. Until something is listed, ask before choosing. -->
 
 ## Conventions

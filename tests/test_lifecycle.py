@@ -126,6 +126,36 @@ def test_publish_duplicate_version_returns_409(db_client):
     assert event_types(db_client, second["id"]) == ["CREATED"]
 
 
+def test_error_messages_name_the_version(db_client):
+    # The UI shows these texts as they are, so they name the version, not the id
+    no_description = create_draft(db_client, description="")
+    published = create_published(db_client, version="1.0.0")
+    duplicate = create_draft(db_client, version="1.0.0")
+
+    publish_empty = db_client.post(f"/api/releases/{no_description['id']}/publish")
+    publish_duplicate = db_client.post(f"/api/releases/{duplicate['id']}/publish")
+    publish_again = db_client.post(f"/api/releases/{published['id']}/publish")
+    edit_published = db_client.patch(
+        f"/api/releases/{published['id']}", json={"description": "late fix"}
+    )
+    archive_draft = db_client.post(f"/api/releases/{duplicate['id']}/archive")
+
+    assert publish_empty.json()["detail"] == (
+        "Add a description to 1.0.0 before publishing it"
+    )
+    assert publish_duplicate.json()["detail"] == (
+        "Version 1.0.0 is already published or archived; "
+        "change the version before publishing"
+    )
+    assert publish_again.json()["detail"] == "1.0.0 is already published"
+    assert edit_published.json()["detail"] == (
+        "1.0.0 is published and can no longer be edited"
+    )
+    assert archive_draft.json()["detail"] == (
+        "Only published releases can be archived; 1.0.0 is draft"
+    )
+
+
 def test_publish_id_too_big_returns_422(db_client):
     response = db_client.post("/api/releases/99999999999999999999/publish")
 

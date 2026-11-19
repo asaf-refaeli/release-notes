@@ -57,8 +57,9 @@ def create_release(session: Session, data: ReleaseCreate) -> Release:
 def update_release(session: Session, release_id: int, data: ReleaseUpdate) -> Release:
     release = _lock_release(session, release_id)
     if release.status != ReleaseStatus.DRAFT:
+        # Messages name the version, not the id: the UI shows them as they are.
         raise InvalidTransition(
-            f"Release {release_id} is {release.status}; only drafts can be edited"
+            f"{release.version} is {release.status.lower()} and can no longer be edited"
         )
     sent = data.model_dump(exclude_none=True)  # null = not sent
     # Keep only real changes, so a same-value PATCH writes no UPDATED event.
@@ -78,10 +79,12 @@ def publish_release(session: Session, release_id: int) -> Release:
     release = _lock_release(session, release_id)
     if release.status != ReleaseStatus.DRAFT:
         raise InvalidTransition(
-            f"Release {release_id} is {release.status}; only drafts can be published"
+            f"{release.version} is already {release.status.lower()}"
         )
     if not release.description.strip():
-        raise PublishValidationError("A release needs a description to be published")
+        raise PublishValidationError(
+            f"Add a description to {release.version} before publishing it"
+        )
     version = release.version  # read now: after a rollback the object is expired
     release.status = ReleaseStatus.PUBLISHED
     release.published_at = func.now()  # set by the DB clock, not the client or the pod
@@ -95,7 +98,8 @@ def publish_release(session: Session, release_id: int) -> Release:
             raise
         session.rollback()
         raise DuplicateVersion(
-            f"Version {version} is already used by a published or archived release"
+            f"Version {version} is already published or archived; "
+            "change the version before publishing"
         ) from exc
     session.refresh(release)
     return release
@@ -105,8 +109,8 @@ def archive_release(session: Session, release_id: int) -> Release:
     release = _lock_release(session, release_id)
     if release.status != ReleaseStatus.PUBLISHED:
         raise InvalidTransition(
-            f"Release {release_id} is {release.status}; "
-            "only published releases can be archived"
+            "Only published releases can be archived; "
+            f"{release.version} is {release.status.lower()}"
         )
     # published_at is kept: an archived release was published at that time.
     release.status = ReleaseStatus.ARCHIVED

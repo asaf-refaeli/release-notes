@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Release Notes</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/app.css">
+  <script type="module" src="/app.js"></script>
+</head>
+<body>
+  <header class="topbar">
+    <img src="/favicon.svg" alt="" width="28" height="28">
+    <span class="brand">Release Notes</span>
+    <a href="/docs">API docs</a>
+  </header>
+
+  <main>
+    <div class="page-header">
+      <div>
+        <h1>Releases</h1>
+        <p class="subtitle">Manage software releases, lifecycle, and audit history.</p>
+      </div>
+      <button id="new-button" class="primary with-icon" type="button">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor"
+             stroke-width="2.5" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+        New Release
+      </button>
+    </div>
+
+    <div class="workspace">
+      <div class="card table-card">
+        <table>
+          <thead>
+            <tr>
+              <th class="c-version">Version</th>
+              <th class="c-desc">Description</th>
+              <th class="c-status">Status</th>
+              <th class="c-created">Created</th>
+              <th class="c-actions">Actions</th>
+            </tr>
+          </thead>
+          <tbody id="releases"></tbody>
+        </table>
+        <p id="empty" hidden>No releases yet. Create the first one with New Release.</p>
+      </div>
+
+      <section id="panel" class="card release-panel empty">
+        <p id="panel-placeholder" class="placeholder">Select a release to see its description and audit history.</p>
+        <div id="panel-content" hidden>
+          <div class="panel-body">
+            <div class="panel-head">
+              <span id="panel-version" class="panel-version"></span>
+              <span id="panel-status"></span>
+            </div>
+            <p id="panel-description" class="panel-description"></p>
+          </div>
+          <h2 class="panel-title">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor"
+                 stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+            Audit History
+          </h2>
+          <ol id="history-events" class="timeline"></ol>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <footer>Release Notes · version <span id="app-version">…</span></footer>
+
+  <dialog id="release-dialog" aria-labelledby="dialog-title">
+    <form id="release-form" novalidate>
+      <h2 id="dialog-title">New release</h2>
+      <label for="version">Version</label>
+      <input id="version" name="version" required maxlength="32" placeholder="1.4.0"
+             autocomplete="off" aria-describedby="version-error">
+      <p id="version-error" class="field-error"></p>
+      <label for="description">Description</label>
+      <textarea id="description" name="description" maxlength="5000" rows="4"
+                aria-describedby="description-error"></textarea>
+      <p id="description-error" class="field-error"></p>
+      <p id="form-error" class="field-error" role="alert"></p>
+      <div class="dialog-buttons">
+        <button id="cancel-button" class="secondary" type="button">Cancel</button>
+        <button id="save-button" class="primary" type="submit">Create draft</button>
+      </div>
+    </form>
+  </dialog>
+
+  <div id="toast" role="status" hidden></div>
+</body>
+</html>

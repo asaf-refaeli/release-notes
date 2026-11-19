@@ -1,0 +1,629 @@
+:root {
+  --bg: #f8fafc;
+  --surface: #ffffff;
+  --text: #0f172a;
+  --heading: #1e3a5f;
+  --muted: #475569;
+  --primary: #2563eb;
+  --primary-hover: #1d4ed8;
+  --border: #e2e8f0;
+  --button-border: #64748b;
+  --hover: #f1f5f9;
+  --error: #dc2626;
+  /* Status colours (text on tint): only for badges and timeline dots, never for buttons. */
+  --draft-text: #475569;
+  --draft-tint: #f1f5f9;
+  --published-text: #166534;
+  --published-tint: #dcfce7;
+  --archived-text: #92400e;
+  --archived-tint: #fef3c7;
+  --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+[hidden] {
+  display: none !important;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: system-ui, sans-serif;
+  line-height: 1.5;
+}
+
+/* ---------- top bar, page header, footer ---------- */
+
+.topbar {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 1.5rem;
+  background: var(--text);
+  color: var(--surface);
+}
+
+.brand {
+  font-size: 1.1rem;
+  font-weight: 700;
+}
+
+.topbar a {
+  margin-left: auto;
+  color: var(--surface);
+}
+
+main {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 2rem 1.5rem;
+}
+
+.page-header {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+h1 {
+  margin: 0;
+  font-size: 1.875rem;
+  line-height: 1.2;
+  color: var(--heading);
+}
+
+.subtitle {
+  margin: 0.25rem 0 0;
+  color: var(--muted);
+}
+
+footer {
+  padding: 1rem;
+  color: var(--muted);
+  font-size: 0.875rem;
+  text-align: center;
+}
+
+/* ---------- buttons ---------- */
+
+button {
+  padding: 0.5rem 1rem;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  font: inherit;
+  cursor: pointer;
+  transition: background-color 150ms;
+}
+
+button:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+
+.primary {
+  background: var(--primary);
+  color: var(--surface);
+}
+
+.primary:hover {
+  background: var(--primary-hover);
+}
+
+/* Three looks, by importance: Publish solid blue, Archive outlined, Edit and Cancel lightest. */
+.secondary {
+  background: var(--surface);
+  color: var(--text);
+  border-color: var(--border);
+}
+
+.archive {
+  background: var(--surface);
+  color: var(--text);
+  border-color: var(--button-border);
+}
+
+.secondary:hover,
+.archive:hover {
+  background: var(--hover);
+}
+
+.small {
+  padding: 0.25rem 0.5rem;
+  font-size: 0.875rem;
+}
+
+.with-icon {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+/* ---------- layout: table on the left, release panel on the right ---------- */
+
+.workspace {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(16rem, 1fr);
+  gap: 1.25rem;
+  align-items: start;
+}
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+/* ---------- table: fixed column widths, so it never scrolls sideways ---------- */
+
+.table-card {
+  overflow: hidden;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+
+th,
+td {
+  padding: 0.625rem 0.75rem;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+  vertical-align: middle;
+}
+
+th {
+  color: var(--muted);
+  font-size: 0.875rem;
+}
+
+tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.c-version {
+  width: 5.5rem;
+}
+
+.c-status {
+  width: 7.75rem;
+}
+
+.c-created {
+  width: 7.5rem;
+}
+
+.c-actions {
+  width: 11rem;
+}
+
+tbody tr {
+  cursor: pointer;
+}
+
+tbody tr:hover,
+tr.selected {
+  background: var(--hover);
+}
+
+tbody tr:focus-visible {
+  outline-offset: -2px;
+}
+
+.chip {
+  padding: 0.125rem 0.375rem;
+  border-radius: 4px;
+  background: var(--hover);
+  font-family: var(--mono);
+  font-size: 0.875rem;
+  white-space: nowrap;
+  /* A long version (up to 32 characters) is cut with "…" instead of covering the next column. */
+  display: inline-block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  vertical-align: middle;
+}
+
+tbody tr:hover .chip,
+tr.selected .chip {
+  background: var(--surface);
+}
+
+/* One line in the table; the full text is in the panel. */
+.description {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.date {
+  color: var(--muted);
+  font-size: 0.875rem;
+  line-height: 1.3;
+  white-space: nowrap;
+}
+
+.date span {
+  display: block;
+}
+
+.date .time {
+  font-size: 0.8rem;
+}
+
+#empty {
+  margin: 0;
+  padding: 1rem 0.75rem;
+  color: var(--muted);
+}
+
+/* Two fixed slots: Edit on the left, Publish or Archive always on the right. */
+.slots {
+  display: grid;
+  grid-template-columns: 4rem 5rem;
+  gap: 0.375rem;
+}
+
+.slots button {
+  width: 100%;
+}
+
+.slots .next {
+  grid-column: 2;
+}
+
+/* ---------- status badge: a dot plus the word ---------- */
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.125rem 0.625rem;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-transform: capitalize;
+}
+
+.badge::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.badge.draft {
+  color: var(--draft-text);
+  background: var(--draft-tint);
+}
+
+.badge.published {
+  color: var(--published-text);
+  background: var(--published-tint);
+}
+
+.badge.archived {
+  color: var(--archived-text);
+  background: var(--archived-tint);
+}
+
+/* ---------- release panel: description and audit history ---------- */
+
+/* Stays in view while a long table scrolls. */
+.release-panel {
+  position: sticky;
+  top: 1rem;
+}
+
+/* Before a row is opened: no card, just a centred hint. */
+.release-panel.empty {
+  display: grid;
+  place-items: center;
+  min-height: 16rem;
+  background: transparent;
+  border-color: transparent;
+}
+
+.placeholder {
+  max-width: 24ch;
+  margin: 0;
+  color: var(--muted);
+  text-align: center;
+  text-wrap: balance;
+}
+
+.panel-body {
+  padding: 1.25rem;
+}
+
+.panel-head {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.panel-version {
+  font-family: var(--mono);
+  font-size: 1.5rem;
+  font-weight: 700;
+  overflow-wrap: anywhere; /* the full version, on two lines if needed */
+}
+
+/* Full text with the line breaks the user typed. */
+.panel-description {
+  margin: 0.75rem 0 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.panel-description.none {
+  color: var(--muted);
+}
+
+.panel-title {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0;
+  padding: 0.875rem 1.25rem;
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  font-size: 1rem;
+  color: var(--heading);
+}
+
+.panel-title svg {
+  color: var(--muted);
+}
+
+/* ---------- audit timeline ---------- */
+
+.timeline {
+  margin: 0;
+  padding: 1.25rem;
+  list-style: none;
+}
+
+.timeline li {
+  position: relative;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  column-gap: 1rem;
+  padding: 0 0 1.25rem 1.75rem;
+}
+
+.timeline li:last-child {
+  padding-bottom: 0;
+}
+
+/* The line joining one dot to the next. */
+.timeline li::before {
+  content: "";
+  position: absolute;
+  left: 5px;
+  top: 1.125rem;
+  bottom: 0;
+  width: 2px;
+  background: var(--border);
+}
+
+.timeline li:last-child::before {
+  display: none;
+}
+
+.dot {
+  position: absolute;
+  left: 0;
+  top: 0.375rem;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+}
+
+.dot.created {
+  background: var(--muted);
+}
+
+.dot.updated {
+  background: var(--primary);
+}
+
+.dot.published {
+  background: var(--published-text);
+}
+
+.dot.archived {
+  background: var(--archived-text);
+}
+
+.event-title {
+  font-weight: 600;
+}
+
+.event-time {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  color: var(--muted);
+  font-size: 0.875rem;
+  text-align: right;
+}
+
+.event-text {
+  grid-column: 1;
+  color: var(--muted);
+  font-size: 0.875rem;
+}
+
+/* ---------- New/Edit dialog ---------- */
+
+dialog {
+  width: min(30rem, calc(100% - 2rem));
+  padding: 1.5rem;
+  border: 0;
+  border-radius: 10px;
+  box-shadow: 0 20px 40px rgb(15 23 42 / 0.25);
+}
+
+dialog::backdrop {
+  background: rgb(15 23 42 / 0.45);
+}
+
+dialog h2 {
+  margin: 0 0 0.5rem;
+  font-size: 1.25rem;
+  color: var(--heading);
+}
+
+label {
+  display: block;
+  margin: 0.75rem 0 0.25rem;
+  font-weight: 600;
+}
+
+input,
+textarea {
+  width: 100%;
+  padding: 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font: inherit;
+  color: inherit;
+}
+
+textarea {
+  resize: vertical;
+}
+
+[aria-invalid="true"] {
+  border-color: var(--error);
+}
+
+/* Takes no space while empty; stays in the page so screen readers hear new text. */
+.field-error {
+  margin: 0.25rem 0 0;
+  color: var(--error);
+  font-size: 0.875rem;
+}
+
+.field-error:empty {
+  margin: 0;
+}
+
+.dialog-buttons {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  margin-top: 1.25rem;
+}
+
+/* ---------- toast ---------- */
+
+#toast {
+  position: fixed;
+  right: 1.5rem;
+  bottom: 1.5rem;
+  max-width: 24rem;
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--muted);
+  border-radius: 8px;
+  background: var(--surface);
+  box-shadow: 0 10px 24px rgb(15 23 42 / 0.15);
+}
+
+#toast.success {
+  border-left-color: var(--published-text);
+}
+
+#toast.error {
+  border-left-color: var(--error);
+}
+
+/* ---------- smaller screens ---------- */
+
+/* The panel moves under the table. */
+@media (max-width: 1100px) {
+  .workspace {
+    grid-template-columns: 1fr;
+  }
+
+  .release-panel {
+    position: static;
+  }
+
+  .release-panel.empty {
+    min-height: 6rem;
+  }
+}
+
+/* Phones: keep Version, Status and the buttons; the panel has the rest. */
+@media (max-width: 720px) {
+  main {
+    padding: 1.25rem 1rem;
+  }
+
+  .topbar {
+    padding: 0.75rem 1rem;
+  }
+
+  .c-desc,
+  .description,
+  .c-created,
+  .date {
+    display: none;
+  }
+
+  th,
+  td {
+    padding: 0.5rem 0.375rem;
+  }
+
+  .c-version {
+    width: 4.5rem;
+  }
+
+  .c-status {
+    width: 6.75rem;
+  }
+
+  .c-actions {
+    width: 9rem;
+  }
+
+  .slots {
+    grid-template-columns: 3.5rem 4.5rem;
+    gap: 0.25rem;
+  }
+
+  .slots button {
+    padding: 0.25rem;
+    font-size: 0.8rem;
+  }
+
+  #toast {
+    left: 1rem;
+    right: 1rem;
+    max-width: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  button {
+    transition: none;
+  }
+}
