@@ -2,9 +2,41 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Release Notes</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/app.css">
+  <script type="module" src="/app.js"></script>
 </head>
 <body>
-  <h1>Release Notes</h1>
+  <main>
+    <h1>Release Notes</h1>
+
+    <form id="release-form" class="card">
+      <h2>New draft</h2>
+      <label for="version">Version</label>
+      <input id="version" name="version" required maxlength="32"
+             pattern="[0-9]+\.[0-9]+\.[0-9]+" placeholder="1.4.0" autocomplete="off">
+      <label for="description">Description</label>
+      <textarea id="description" name="description" maxlength="5000" rows="3"></textarea>
+      <button id="create-button" type="submit">Create draft</button>
+      <p id="error" role="alert"></p>
+    </form>
+
+    <section class="card">
+      <h2>Releases</h2>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>Version</th><th>Status</th><th>Description</th><th>Created</th></tr>
+          </thead>
+          <tbody id="releases"></tbody>
+        </table>
+      </div>
+      <p id="empty" hidden>No releases yet.</p>
+    </section>
+  </main>
+
+  <footer>Release Notes · version <span id="app-version">…</span></footer>
 </body>
 </html>
