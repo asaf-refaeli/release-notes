@@ -12,9 +12,12 @@ HARDENED=(--read-only --read-only-tmpfs=false --cap-drop ALL --security-opt no-n
 
 fail() {
     echo "FAIL: $1" >&2
-    if podman container exists "$POD-app"; then
-        podman logs "$POD-app" 2>&1 | tail -30 >&2
-    fi
+    for name in "$POD-db" "$POD-app"; do
+        if podman container exists "$name"; then
+            echo "--- last log lines of $name" >&2
+            podman logs "$name" 2>&1 | tail -30 >&2
+        fi
+    done
     exit 1
 }
 
