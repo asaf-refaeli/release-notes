@@ -61,6 +61,7 @@ Their purpose is to explain why each choice was made.
 - UI: static files and plain JavaScript on the JSON API, strict CSP (ADR-0007)
 - Container image: Python slim, two stages, non-root, read-only (ADR-0008)
 - One image for the app, the migration Job and the UI (ADR-0009)
+- Migration ordering: Argo CD Sync hook and sync waves, DB -1, Job 0, app 1 (ADR-0010)
 <!-- Add each decision here once it's made. Until something is listed, ask before choosing. -->
 
 ## Conventions
