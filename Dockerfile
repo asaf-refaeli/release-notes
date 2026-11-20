@@ -29,6 +29,8 @@ COPY alembic.ini ./
 COPY migrations ./migrations
 COPY app ./app
 
+RUN python -m compileall -q app migrations
+
 USER 10001
 
 EXPOSE 8080

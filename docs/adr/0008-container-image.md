@@ -9,7 +9,7 @@
 Two stages on `docker.io/library/python:3.14.10-slim-trixie` (tag + digest): the builder runs `uv sync --locked --no-dev`, the runtime copies the venv, `alembic.ini`, `migrations/` and `app/`, runs as `USER 10001`, and starts Uvicorn in exec form. Choices that need a reason:
 - **Debian slim as the base:** the official Python image, slim (no compilers or extra tools), on Debian 13 (trixie), the current stable. Every dependency installs as a ready-made glibc wheel (`psycopg[binary]` bundles its own Postgres client library), so nothing is compiled or installed with `apt-get`.
 - **`pyproject.toml` and `uv.lock` are copied in, not bind-mounted** (the uv docs use bind mounts): Buildah 1.33's layer cache ignores bind-mounted file contents, so a local rebuild after a dependency change reused the old install and skipped the `--locked` check (reproduced).
-- **Bytecode compiled at build time** (`UV_COMPILE_BYTECODE=1`): Python cannot write its cache on a read-only disk.
+- **Bytecode compiled at build time**, the packages by uv (`UV_COMPILE_BYTECODE=1`) and the app and migrations by `python -m compileall`: Python cannot write its cache on a read-only disk.
 - **pip removed:** unused at runtime and a common source of CVE findings.
 - **Files owned by root, not `COPY --chown`:** the app can read its code but not change it.
 - **`CMD`, not `ENTRYPOINT`:** the migration Job runs `alembic upgrade head` from the same image by replacing the command (one image for app, migrations and UI: ADR-0009).
