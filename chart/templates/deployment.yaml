@@ -13,6 +13,7 @@ spec:
   replicas: {{ .Values.replicaCount }}
   {{- end }}
   revisionHistoryLimit: {{ .Values.revisionHistoryLimit }}
+  minReadySeconds: {{ .Values.minReadySeconds }}
   {{- with .Values.strategy }}
   strategy:
     {{- toYaml . | nindent 4 }}

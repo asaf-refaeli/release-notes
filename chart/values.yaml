@@ -92,6 +92,10 @@ readinessProbe:
   timeoutSeconds: 3
   failureThreshold: 3
 
+# A new pod must stay Ready this long before the rollout removes the next old pod,
+# so a version that passes one probe and then crashes stops the rollout early.
+minReadySeconds: 5
+
 # Rollout: a new pod must be Ready before an old one stops. Proven by the rollout check.
 strategy:
   type: RollingUpdate
