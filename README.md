@@ -112,12 +112,18 @@ See [ADR-0008](docs/adr/0008-container-image.md) and [ADR-0009](docs/adr/0009-on
 | ServiceMonitor | Off by default (`serviceMonitor.enabled`, needs the Prometheus Operator CRD); scrapes `/metrics`. |
 | StatefulSet, headless Service, PVC | Postgres 18 pinned by digest, one pod, UID 999, read-only root filesystem, a 1Gi PVC on the default StorageClass. Off with `postgres.enabled: false`. |
 | Job | `alembic upgrade head` with the app image, as an Argo CD `Sync` hook. |
+| Job, ServiceAccount, Role, RoleBinding | Creates the database password Secret if it is missing, as Argo CD `PreSync` hooks. Off with `database.createSecret.enabled: false`. |
 
 **Order ([ADR-0010](docs/adr/0010-migration-ordering.md)):** Argo CD sync waves run Postgres (`-1`), then the migration Job (`0`), then the app Deployment (`1`). Each wave waits for the previous one to be healthy, so a failed migration stops the sync before any new app pod starts.
 
 **Database values:** `database` says how the app and the Job connect (host, port, name, user, Secret, pool size). `postgres` configures the Postgres server in the chart (image, storage, security context, resources); it reads the same user, name and Secret, so both sides always match. For an external database, set `postgres.enabled=false` and `database.host`; without a host the render fails.
 
-**Credentials ([ADR-0011](docs/adr/0011-database-credentials.md)):** the password lives in a Secret named by `database.existingSecret` (default `release-notes-db`, key `password`), created outside the chart and never in Git. Kubernetes builds `DATABASE_URL` from it with `$(DATABASE_PASSWORD)`, so the password must be letters and digits only: generate it with `openssl rand -hex 16`. Postgres applies the password only on its first start, so do not recreate the Secret while the PVC is kept.
+**Credentials ([ADR-0011](docs/adr/0011-database-credentials.md)):**
+- The password lives in a Secret named by `database.existingSecret` (default `release-notes-db`, key `password`), never in Git.
+- A Job in the chart creates it with a random 32-character hex password if it is missing, as an Argo CD `PreSync` hook before Postgres starts. An existing Secret is kept.
+- Kubernetes builds `DATABASE_URL` from it with `$(DATABASE_PASSWORD)`, so the password must be letters and digits only.
+- Postgres applies the password only on its first start, so do not delete or recreate the Secret while the PVC is kept.
+- For an external database or a Secret from elsewhere, set `database.createSecret.enabled: false` and create the Secret yourself.
 
 **Connection budget:** (app pods + 1 surge pod + 1 pod still shutting down) x (`database.poolSize` + `database.maxOverflow`) + 1 migration Job must stay below `postgres.maxConnections` (200; the Postgres default of 100 is too tight for a rollout at full scale). App pods = `autoscaling.maxReplicas` with the HPA on, else `replicaCount`. With the defaults: (5 + 2) x 15 + 1 = 106. The chart checks this at render time and fails with the numbers when a combination does not fit.
 
@@ -152,8 +158,6 @@ kind load image-archive release-notes.tar --name release-notes && rm release-not
 kubectl --context kind-release-notes create namespace release-notes-test
 kubectl --context kind-release-notes label namespace release-notes-test \
   pod-security.kubernetes.io/enforce=restricted
-kubectl --context kind-release-notes -n release-notes-test create secret generic release-notes-db \
-  --from-literal=password="$(openssl rand -hex 16)"
 helm --kube-context kind-release-notes install release-notes chart -n release-notes-test \
   --set image.repository=localhost/release-notes --set image.tag=local
 
@@ -162,7 +166,10 @@ kubectl --context kind-release-notes -n release-notes-test port-forward service/
 
 Then open http://127.0.0.1:8080/ (`http`, not `https`). On WSL with a Windows browser, add `--address 0.0.0.0` to the port-forward.
 
-- Plain Helm ignores the Argo CD waves and starts everything at once. The migration Job can fail once or twice with `failed to resolve host 'release-notes-postgres'` until Postgres is Ready, then succeeds. Until the tables exist, the app can answer 500.
+- Plain Helm ignores the Argo CD hooks and waves and starts everything at once:
+  - Postgres and the app wait in `CreateContainerConfigError` until the `release-notes-db-secret` Job has created the Secret.
+  - The migration Job can fail once or twice with `failed to resolve host 'release-notes-postgres'` until Postgres is Ready, then succeeds.
+  - Until the tables exist, the app can answer 500.
 - A plain `helm upgrade` cannot change the existing migration Job (its pod template is immutable). Delete the Job first: `kubectl --context kind-release-notes -n release-notes-test delete job release-notes-migrate`.
 
 ## Repository layout
@@ -192,4 +199,4 @@ Dockerfile    The container image
 | [0008](docs/adr/0008-container-image.md) | Container image: Python slim, two stages, non-root, read-only |
 | [0009](docs/adr/0009-one-image.md) | One image for the app, the migration Job and the UI |
 | [0010](docs/adr/0010-migration-ordering.md) | Migration Job as an Argo CD Sync hook, ordered by sync waves |
-| [0011](docs/adr/0011-database-credentials.md) | Database password from a generated Secret; Kubernetes builds `DATABASE_URL` |
+| [0011](docs/adr/0011-database-credentials.md) | Database password Secret generated in the cluster by a PreSync Job; Kubernetes builds `DATABASE_URL` |
