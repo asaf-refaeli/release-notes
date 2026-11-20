@@ -1,0 +1,7 @@
+Release Notes {{ include "release-notes.appVersion" . }} is deploying to namespace {{ .Release.Namespace }}.
+
+Reach the UI from your machine:
+  kubectl --namespace {{ .Release.Namespace }} port-forward service/{{ include "release-notes.fullname" . }} 8080:{{ .Values.service.port }}
+  then open http://127.0.0.1:8080/
+
+The database password comes from Secret "{{ .Values.database.existingSecret }}" (key "{{ .Values.database.passwordKey }}"), created outside this chart.

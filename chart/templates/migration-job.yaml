@@ -1,0 +1,48 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "release-notes.fullname" . }}-migrate
+  labels:
+    {{- include "release-notes.labels" . | nindent 4 }}
+    app.kubernetes.io/component: migration
+  annotations:
+    # Argo CD runs this Job in every sync, after Postgres (-1) and before the app (1), see ADR-0010.
+    # BeforeHookCreation deletes the previous Job first (a Job's pod template cannot be changed)
+    # and keeps the last run for its logs. No ttlSecondsAfterFinished: it can hang the sync.
+    # A plain helm install ignores these annotations and creates the Job with everything else.
+    argocd.argoproj.io/hook: Sync
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+    argocd.argoproj.io/sync-wave: "0"
+spec:
+  backoffLimit: {{ .Values.migration.backoffLimit }}
+  activeDeadlineSeconds: {{ .Values.migration.activeDeadlineSeconds }}
+  template:
+    metadata:
+      labels:
+        {{- include "release-notes.labels" . | nindent 8 }}
+        app.kubernetes.io/component: migration
+    spec:
+      # A new pod per retry, so each failed attempt keeps its own logs.
+      restartPolicy: Never
+      # The default ServiceAccount without a token: the Job never calls the Kubernetes API,
+      # and it does not wait for the app's ServiceAccount, created in the same wave.
+      automountServiceAccountToken: false
+      {{- with .Values.podSecurityContext }}
+      securityContext:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: migrate
+          # Same image as the app (ADR-0009): it carries alembic.ini and migrations/.
+          image: {{ include "release-notes.image" . | quote }}
+          command: ["alembic", "upgrade", "head"]
+          {{- with .Values.securityContext }}
+          securityContext:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          env:
+            {{- include "release-notes.databaseEnv" . | nindent 12 }}
+          {{- with .Values.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
