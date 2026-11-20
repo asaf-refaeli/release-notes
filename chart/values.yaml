@@ -43,8 +43,7 @@ serviceMonitor:
 autoscaling:
   enabled: false
   minReplicas: 2
-  # DB connection budget: (maxReplicas + 1 surge pod) x (poolSize + maxOverflow) + 1 migration Job
-  # must stay below Postgres max_connections (100): (5 + 1) x 15 + 1 = 91.
+  # Checked at render time against postgres.maxConnections (see release-notes.validate).
   maxReplicas: 5
   # Percent of resources.requests.cpu, averaged over all pods.
   targetCPUUtilizationPercentage: 70
@@ -134,7 +133,9 @@ database:
   # The password is placed inside DATABASE_URL, so it must be letters and digits only.
   passwordKey: password
   # Connections per app pod: poolSize + maxOverflow (app defaults 5 + 10).
-  # See autoscaling.maxReplicas for the connection budget.
+  # Connection budget, checked at render time (release-notes.validate):
+  #   (pods + 1 surge pod + 1 pod still shutting down) x (poolSize + maxOverflow) + 1 migration Job
+  #   < postgres.maxConnections. Defaults: (5 + 2) x 15 + 1 = 106 < 200.
   poolSize: 5
   maxOverflow: 10
 
@@ -146,6 +147,9 @@ postgres:
     repository: docker.io/library/postgres
     tag: 18.7-trixie
     digest: sha256:e754b839f447639b7004895f4d8a4bfcb4e9dbe3a1bc035f27f646562a16fd61
+  # Postgres default is 100. 200 leaves room for pods still shutting down during a rollout
+  # (they keep their pools open up to the 25 s drain) and for manual psql sessions.
+  maxConnections: 200
   storage:
     size: 1Gi
     # Empty: the cluster's default StorageClass.
@@ -155,6 +159,9 @@ postgres:
     runAsUser: 999
     runAsGroup: 999
     fsGroup: 999
+    # Fix volume ownership only when the volume's top folder is wrong, instead of walking
+    # every file on every start (slow on a large database).
+    fsGroupChangePolicy: OnRootMismatch
     runAsNonRoot: true
     seccompProfile:
       type: RuntimeDefault

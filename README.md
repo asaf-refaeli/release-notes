@@ -119,7 +119,7 @@ See [ADR-0008](docs/adr/0008-container-image.md) and [ADR-0009](docs/adr/0009-on
 
 **Credentials ([ADR-0011](docs/adr/0011-database-credentials.md)):** the password lives in a Secret named by `database.existingSecret` (default `release-notes-db`, key `password`), created outside the chart and never in Git. Kubernetes builds `DATABASE_URL` from it with `$(DATABASE_PASSWORD)`, so the password must be letters and digits only: generate it with `openssl rand -hex 16`. Postgres applies the password only on its first start, so do not recreate the Secret while the PVC is kept.
 
-**Connection budget:** (`autoscaling.maxReplicas` + 1 surge pod) x (`database.poolSize` + `database.maxOverflow`) + 1 migration Job must stay below Postgres `max_connections` (100). With the defaults: (5 + 1) x 15 + 1 = 91. The values schema caps `maxReplicas` at 5.
+**Connection budget:** (app pods + 1 surge pod + 1 pod still shutting down) x (`database.poolSize` + `database.maxOverflow`) + 1 migration Job must stay below `postgres.maxConnections` (200; the Postgres default of 100 is too tight for a rollout at full scale). App pods = `autoscaling.maxReplicas` with the HPA on, else `replicaCount`. With the defaults: (5 + 2) x 15 + 1 = 106. The chart checks this at render time and fails with the numbers when a combination does not fit.
 
 ### Validate the chart
 
@@ -136,7 +136,8 @@ podman run --rm -v "$PWD":/work:Z -w /work \
   sh -c 'git config --global --add safe.directory /work && ct lint --charts chart --validate-maintainers=false --check-version-increment=false'
 ```
 
-- `values.schema.json` rejects unknown keys and bad values, for example a typo in a key, `autoscaling.maxReplicas: 6` or `logLevel: info`.
+- `values.schema.json` rejects unknown keys and bad values, for example a typo in a key or `logLevel: info`.
+- Render-time checks (`release-notes.validate`) reject combinations the schema cannot express: the connection budget, `minReplicas` above `maxReplicas`, and `database.host` set while the in-chart Postgres is still enabled.
 - `chart/ci/` holds the test cases: the defaults, every optional feature on, and an external database.
 
 ### Install on kind

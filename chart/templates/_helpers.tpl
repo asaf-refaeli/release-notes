@@ -32,8 +32,32 @@ Labels for every resource. Each template adds its own app.kubernetes.io/componen
 {{- define "release-notes.labels" -}}
 helm.sh/chart: {{ include "release-notes.chart" . }}
 {{ include "release-notes.selectorLabels" . }}
-app.kubernetes.io/version: {{ include "release-notes.appVersion" . | quote }}
+{{- /* Label values are capped at 63 characters; image tags can be up to 128. */}}
+app.kubernetes.io/version: {{ include "release-notes.appVersion" . | trunc 63 | trimSuffix "-" | quote }}
 app.kubernetes.io/managed-by: {{ .Release.Service }}
+{{- end }}
+
+{{/*
+Checks that need more than one value, which the schema cannot express. Fails the render
+with a message, so a bad combination is caught by lint, CI or Argo CD before anything is applied.
+*/}}
+{{- define "release-notes.validate" -}}
+{{- if and .Values.database.host .Values.postgres.enabled }}
+{{- fail "database.host is set but postgres.enabled is true: set postgres.enabled=false to use an external database" }}
+{{- end }}
+{{- if and .Values.autoscaling.enabled (gt (int .Values.autoscaling.minReplicas) (int .Values.autoscaling.maxReplicas)) }}
+{{- fail (printf "autoscaling.minReplicas (%v) is greater than autoscaling.maxReplicas (%v)" .Values.autoscaling.minReplicas .Values.autoscaling.maxReplicas) }}
+{{- end }}
+{{- if .Values.postgres.enabled }}
+{{- /* Most app pods at once: the HPA max, or replicaCount without an HPA. During a rollout add
+       1 surge pod and 1 old pod still shutting down (it keeps its pool for up to the 25 s drain). */}}
+{{- $pods := ternary .Values.autoscaling.maxReplicas .Values.replicaCount .Values.autoscaling.enabled | int }}
+{{- $perPod := add .Values.database.poolSize .Values.database.maxOverflow | int }}
+{{- $needed := add (mul (add $pods 2) $perPod) 1 | int }}
+{{- if ge $needed (int .Values.postgres.maxConnections) }}
+{{- fail (printf "DB connection budget exceeded: (%d pods + 2) x %d connections + 1 migration Job = %d, but postgres.maxConnections is %v. Lower the pods or the pool, or raise postgres.maxConnections." $pods $perPod $needed .Values.postgres.maxConnections) }}
+{{- end }}
+{{- end }}
 {{- end }}
 
 {{/*

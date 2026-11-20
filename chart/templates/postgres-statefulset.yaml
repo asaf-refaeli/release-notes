@@ -35,6 +35,8 @@ spec:
       containers:
         - name: postgres
           image: "{{ .Values.postgres.image.repository }}:{{ .Values.postgres.image.tag }}@{{ .Values.postgres.image.digest }}"
+          # The image's entrypoint passes arguments starting with "-" on to postgres.
+          args: ["-c", "max_connections={{ .Values.postgres.maxConnections }}"]
           {{- with .Values.postgres.securityContext }}
           securityContext:
             {{- toYaml . | nindent 12 }}

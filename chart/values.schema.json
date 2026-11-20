@@ -69,8 +69,7 @@
         "maxReplicas": {
           "type": "integer",
           "minimum": 1,
-          "maximum": 5,
-          "description": "Capped by the DB connection budget: (maxReplicas + 1) x 15 + 1 must stay below Postgres max_connections (100)."
+          "description": "Checked at render time against postgres.maxConnections (release-notes.validate)."
         },
         "targetCPUUtilizationPercentage": { "type": "integer", "minimum": 1, "maximum": 100 }
       }
@@ -121,6 +120,7 @@
             "digest": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" }
           }
         },
+        "maxConnections": { "type": "integer", "minimum": 20 },
         "storage": {
           "type": "object",
           "additionalProperties": false,

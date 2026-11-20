@@ -48,7 +48,7 @@ Planned, not built yet (move each line up when it lands):
 - `chart/`: Helm chart (ADR-0003): app Deployment, Service, ServiceAccount; HPA, PDB and ServiceMonitor behind toggles; Postgres StatefulSet + headless Service + PVC (`postgres.enabled`); migration Job as an Argo CD Sync hook. Sync waves: Postgres -1, Job 0, app 1 (ADR-0010).
 - `chart/templates/_helpers.tpl`: `name`, `fullname`, `labels`, `selectorLabels`; `appVersion` (`image.tag`, else `Chart.appVersion`; one source for the image, the version label and `APP_VERSION`); `image` (tag, plus `@digest` when `image.digest` is set); `postgresName` (`<fullname>-postgres`); `databaseHost` (`database.host`, else the chart's Postgres; fails the render when `postgres.enabled` is false and no host is set); `databaseEnv` (`DATABASE_PASSWORD` from the Secret, then `DATABASE_URL` with `$(DATABASE_PASSWORD)`; shared by the Deployment and the Job, ADR-0011).
 - Labels: each template adds `app.kubernetes.io/component` (`app`, `database` or `migration`) right under the `selectorLabels`/`labels` include, so the app's Service, PDB and ServiceMonitor never select the Postgres pod.
-- `chart/values.schema.json`: `additionalProperties: false` on the root and every block with fixed keys (a typo'd key fails); guards: `autoscaling.maxReplicas` <= 5 (connection budget), digest pattern, `logLevel` enum, `database.name`/`user` identifier pattern.
+- `chart/values.schema.json`: `additionalProperties: false` on the root and every block with fixed keys (a typo'd key fails); guards: digest pattern, `logLevel` enum, `database.name`/`user` identifier pattern. Checks across several values live in the `release-notes.validate` helper (called from `deployment.yaml`): the connection budget, `minReplicas` <= `maxReplicas`, no `database.host` while `postgres.enabled`.
 - `chart/ci/`: `ct lint` and kubeconform test cases: `default-values.yaml` (empty: the shipped defaults), `all-features-values.yaml` (every toggle on), `external-db-values.yaml` (`postgres.enabled: false` + `database.host`).
 
 Rules:
@@ -59,7 +59,8 @@ Rules:
 - UI: user data reaches the page only through `textContent` (never `innerHTML` and similar); no inline `<script>`, `style=` or `on*=` (the CSP blocks them); API URLs in JS are relative; no CDN, no build step. Element ids are the contract between `index.html` and `app.js` (a test checks them).
 - Chart: never put a password in values; the chart only names the Secret (`database.existingSecret`).
 - Chart: keep `app.kubernetes.io/component` in every selector and pod label set; without it the app's selectors also match Postgres.
-- Chart: keep `(maxReplicas + 1) x (poolSize + maxOverflow) + 1 < max_connections (100)`; change the schema's `maxReplicas` cap with it.
+- Chart: the connection budget `(pods + 2) x (poolSize + maxOverflow) + 1 < postgres.maxConnections (200)` is enforced by `release-notes.validate`; keep the formula there, in the values comment and in the README in step.
+- Chart: the Postgres pod template carries only stable labels (selector labels + component); version or chart labels there would restart the only DB pod on every app release.
 
 ## Decisions
 Decisions are documented as ADRs in `docs/adr/` using `docs/adr/0000-template.md` (a `DECISIONS.md` index comes before CI).
