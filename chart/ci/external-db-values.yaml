@@ -5,3 +5,6 @@ postgres:
 
 database:
   host: db.example.com
+  # The external database's password comes from outside; no generated Secret.
+  createSecret:
+    enabled: false

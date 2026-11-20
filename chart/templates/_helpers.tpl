@@ -45,6 +45,10 @@ with a message, so a bad combination is caught by lint, CI or Argo CD before any
 {{- if and .Values.database.host .Values.postgres.enabled }}
 {{- fail "database.host is set but postgres.enabled is true: set postgres.enabled=false to use an external database" }}
 {{- end }}
+{{- /* A random password is useless for a database this chart does not run. */}}
+{{- if and .Values.database.host .Values.database.createSecret.enabled }}
+{{- fail "database.host is set but database.createSecret.enabled is true: an external database needs its real password in database.existingSecret; set database.createSecret.enabled=false" }}
+{{- end }}
 {{- if and .Values.autoscaling.enabled (gt (int .Values.autoscaling.minReplicas) (int .Values.autoscaling.maxReplicas)) }}
 {{- fail (printf "autoscaling.minReplicas (%v) is greater than autoscaling.maxReplicas (%v)" .Values.autoscaling.minReplicas .Values.autoscaling.maxReplicas) }}
 {{- end }}

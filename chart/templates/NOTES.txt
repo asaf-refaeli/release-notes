@@ -4,4 +4,8 @@ Reach the UI from your machine:
   kubectl --namespace {{ .Release.Namespace }} port-forward service/{{ include "release-notes.fullname" . }} 8080:{{ .Values.service.port }}
   then open http://127.0.0.1:8080/
 
+{{- if .Values.database.createSecret.enabled }}
+The database password comes from Secret "{{ .Values.database.existingSecret }}" (key "{{ .Values.database.passwordKey }}"), created by the {{ include "release-notes.fullname" . }}-db-secret Job if it was missing.
+{{- else }}
 The database password comes from Secret "{{ .Values.database.existingSecret }}" (key "{{ .Values.database.passwordKey }}"), created outside this chart.
+{{- end }}
