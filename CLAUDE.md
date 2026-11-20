@@ -18,6 +18,10 @@ The plan lives outside this repo in `../docs/project-plan.md`.
 - Runtime: Python 3.14, pinned in `.python-version`
 - Build the image: `buildah build --layers -t release-notes:local .` (rootless Buildah; Docker cannot see the result, Podman can). The container runs `uvicorn` directly (exec-form `CMD`, port `8080`), so it is PID 1 and receives SIGTERM for graceful shutdown.
 - Container smoke test: `scripts/smoke-test.sh localhost/release-notes:local` (needs Podman, curl, jq)
+- Chart lint: `helm lint chart`
+- Chart schemas, per test case: `for f in chart/ci/*-values.yaml; do helm template ci chart -f "$f" | kubeconform -strict -summary -schema-location default -schema-location 'https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json'; done`
+- Chart testing (`ct lint`, pinned image, run with Podman): `podman run --rm -v "$PWD":/work:Z -w /work quay.io/helmpack/chart-testing:v3.15.0@sha256:54317f2d93730ea9ca1236e3d79cd95d74110b8d733b6ab124e5829209b5f4e4 sh -c 'git config --global --add safe.directory /work && ct lint --charts chart --validate-maintainers=false --check-version-increment=false'`
+- Local install on kind (only when asked; Argo CD is the deploy path): `podman save` the image and `kind load image-archive ... --name release-notes`; a namespace labelled `pod-security.kubernetes.io/enforce=restricted`; `kubectl create secret generic release-notes-db --from-literal=password="$(openssl rand -hex 16)"`; `helm install release-notes chart -n <ns> --set image.repository=localhost/release-notes --set image.tag=local`. Every command takes `--context kind-release-notes` (kubectl) or `--kube-context kind-release-notes` (helm). Plain Helm ignores the sync waves, so the migration Job may fail 1-2 times before Postgres is Ready; `helm upgrade` cannot change the existing Job (delete it first). Full commands in the README.
 
 Planned, not built yet (move each line up when it lands):
 - Rollout check: `uv run scripts/rollout_check.py --url <base-url>`
@@ -41,6 +45,11 @@ Planned, not built yet (move each line up when it lands):
 - `.dockerignore`: `.git`, `.venv`, `__pycache__`, `.env*`; the `COPY` lines name every path the image needs, never `COPY . .`.
 - `scripts/smoke-test.sh`: container smoke test (bash). Runs Postgres, the migrations and the app in one Podman pod with the Kubernetes restrictions (read-only with no `/tmp`, no capabilities, no `--user` so the image's own user is checked), then checks readiness, create + read back, the UI, and exit code 0 on SIGTERM.
 - `tests/conftest.py`: shared fixtures: one Postgres container and `alembic upgrade head` per run; `db_client` truncates all tables and points the app at the test DB for each test.
+- `chart/`: Helm chart (ADR-0003): app Deployment, Service, ServiceAccount; HPA, PDB and ServiceMonitor behind toggles; Postgres StatefulSet + headless Service + PVC (`postgres.enabled`); migration Job as an Argo CD Sync hook. Sync waves: Postgres -1, Job 0, app 1 (ADR-0010).
+- `chart/templates/_helpers.tpl`: `name`, `fullname`, `labels`, `selectorLabels`; `appVersion` (`image.tag`, else `Chart.appVersion`; one source for the image, the version label and `APP_VERSION`); `image` (tag, plus `@digest` when `image.digest` is set); `postgresName` (`<fullname>-postgres`); `databaseHost` (`database.host`, else the chart's Postgres; fails the render when `postgres.enabled` is false and no host is set); `databaseEnv` (`DATABASE_PASSWORD` from the Secret, then `DATABASE_URL` with `$(DATABASE_PASSWORD)`; shared by the Deployment and the Job, ADR-0011).
+- Labels: each template adds `app.kubernetes.io/component` (`app`, `database` or `migration`) right under the `selectorLabels`/`labels` include, so the app's Service, PDB and ServiceMonitor never select the Postgres pod.
+- `chart/values.schema.json`: `additionalProperties: false` on the root and every block with fixed keys (a typo'd key fails); guards: `autoscaling.maxReplicas` <= 5 (connection budget), digest pattern, `logLevel` enum, `database.name`/`user` identifier pattern.
+- `chart/ci/`: `ct lint` and kubeconform test cases: `default-values.yaml` (empty: the shipped defaults), `all-features-values.yaml` (every toggle on), `external-db-values.yaml` (`postgres.enabled: false` + `database.host`).
 
 Rules:
 - HTTP errors: `404` unknown release, `422` malformed body, `409` invalid transition or duplicate published version, `400` publish rule failed.
@@ -48,6 +57,9 @@ Rules:
 - `/healthz/ready` checks the database; `/healthz/live` never does.
 - API error messages are shown to people as they are: name the version, not the id, and say what to do.
 - UI: user data reaches the page only through `textContent` (never `innerHTML` and similar); no inline `<script>`, `style=` or `on*=` (the CSP blocks them); API URLs in JS are relative; no CDN, no build step. Element ids are the contract between `index.html` and `app.js` (a test checks them).
+- Chart: never put a password in values; the chart only names the Secret (`database.existingSecret`).
+- Chart: keep `app.kubernetes.io/component` in every selector and pod label set; without it the app's selectors also match Postgres.
+- Chart: keep `(maxReplicas + 1) x (poolSize + maxOverflow) + 1 < max_connections (100)`; change the schema's `maxReplicas` cap with it.
 
 ## Decisions
 Decisions are documented as ADRs in `docs/adr/` using `docs/adr/0000-template.md` (a `DECISIONS.md` index comes before CI).

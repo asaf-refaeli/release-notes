@@ -2,7 +2,7 @@
 
 A small internal service for recording what shipped in each release: a FastAPI API on Postgres, with a draft → published → archived lifecycle and an audit trail of every change.
 
-> **Status:** home assignment, in progress. Built: the service with health checks, structured logs, metrics, the release lifecycle, the audit trail, a UI for all of it, and a hardened container image. Next: a Helm chart, CI/CD and a zero-downtime rollout.
+> **Status:** home assignment, in progress. Built: the service with health checks, structured logs, metrics, the release lifecycle, the audit trail, a UI for all of it, a hardened container image, and a Helm chart for the app, its Postgres and the migrations. Next: the GitOps deployment, CI/CD and a zero-downtime rollout.
 
 ## Quickstart
 
@@ -100,6 +100,70 @@ scripts/smoke-test.sh localhost/release-notes:local
 
 See [ADR-0008](docs/adr/0008-container-image.md) and [ADR-0009](docs/adr/0009-one-image.md).
 
+## Helm chart
+
+`chart/` deploys the app, its Postgres and the schema migration. Argo CD installs it from the [gitops](https://github.com/asaf-refaeli/gitops) repo, which holds the per-environment values.
+
+| Resources | What they do |
+|---|---|
+| Deployment, Service, ServiceAccount | The app on container port `8080` (named `http`); the Service listens on `80`. The pods get no Kubernetes API token. |
+| HorizontalPodAutoscaler | On CPU, off by default (`autoscaling.enabled`, needs metrics-server). When on, it owns the replica count. |
+| PodDisruptionBudget | On by default, `maxUnavailable: 1`: a node drain evicts one app pod at a time. |
+| ServiceMonitor | Off by default (`serviceMonitor.enabled`, needs the Prometheus Operator CRD); scrapes `/metrics`. |
+| StatefulSet, headless Service, PVC | Postgres 18 pinned by digest, one pod, UID 999, read-only root filesystem, a 1Gi PVC on the default StorageClass. Off with `postgres.enabled: false`. |
+| Job | `alembic upgrade head` with the app image, as an Argo CD `Sync` hook. |
+
+**Order ([ADR-0010](docs/adr/0010-migration-ordering.md)):** Argo CD sync waves run Postgres (`-1`), then the migration Job (`0`), then the app Deployment (`1`). Each wave waits for the previous one to be healthy, so a failed migration stops the sync before any new app pod starts.
+
+**Database values:** `database` says how the app and the Job connect (host, port, name, user, Secret, pool size). `postgres` configures the Postgres server in the chart (image, storage, security context, resources); it reads the same user, name and Secret, so both sides always match. For an external database, set `postgres.enabled=false` and `database.host`; without a host the render fails.
+
+**Credentials ([ADR-0011](docs/adr/0011-database-credentials.md)):** the password lives in a Secret named by `database.existingSecret` (default `release-notes-db`, key `password`), created outside the chart and never in Git. Kubernetes builds `DATABASE_URL` from it with `$(DATABASE_PASSWORD)`, so the password must be letters and digits only: generate it with `openssl rand -hex 16`. Postgres applies the password only on its first start, so do not recreate the Secret while the PVC is kept.
+
+**Connection budget:** (`autoscaling.maxReplicas` + 1 surge pod) x (`database.poolSize` + `database.maxOverflow`) + 1 migration Job must stay below Postgres `max_connections` (100). With the defaults: (5 + 1) x 15 + 1 = 91. The values schema caps `maxReplicas` at 5.
+
+### Validate the chart
+
+Needs Helm, [kubeconform](https://github.com/yannh/kubeconform) and Podman (for chart-testing).
+
+```bash
+helm lint chart
+for f in chart/ci/*-values.yaml; do
+  helm template ci chart -f "$f" | kubeconform -strict -summary -schema-location default \
+    -schema-location 'https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json'
+done
+podman run --rm -v "$PWD":/work:Z -w /work \
+  quay.io/helmpack/chart-testing:v3.15.0@sha256:54317f2d93730ea9ca1236e3d79cd95d74110b8d733b6ab124e5829209b5f4e4 \
+  sh -c 'git config --global --add safe.directory /work && ct lint --charts chart --validate-maintainers=false --check-version-increment=false'
+```
+
+- `values.schema.json` rejects unknown keys and bad values, for example a typo in a key, `autoscaling.maxReplicas: 6` or `logLevel: info`.
+- `chart/ci/` holds the test cases: the defaults, every optional feature on, and an external database.
+
+### Install on kind
+
+Argo CD is the deploy path; this is for trying the chart by hand. Every command names the kind cluster.
+
+```bash
+buildah build --layers -t release-notes:local .
+podman save -o release-notes.tar localhost/release-notes:local
+kind load image-archive release-notes.tar --name release-notes && rm release-notes.tar
+
+kubectl --context kind-release-notes create namespace release-notes-test
+kubectl --context kind-release-notes label namespace release-notes-test \
+  pod-security.kubernetes.io/enforce=restricted
+kubectl --context kind-release-notes -n release-notes-test create secret generic release-notes-db \
+  --from-literal=password="$(openssl rand -hex 16)"
+helm --kube-context kind-release-notes install release-notes chart -n release-notes-test \
+  --set image.repository=localhost/release-notes --set image.tag=local
+
+kubectl --context kind-release-notes -n release-notes-test port-forward service/release-notes 8080:80
+```
+
+Then open http://127.0.0.1:8080/ (`http`, not `https`). On WSL with a Windows browser, add `--address 0.0.0.0` to the port-forward.
+
+- Plain Helm ignores the Argo CD waves and starts everything at once. The migration Job can fail once or twice with `failed to resolve host 'release-notes-postgres'` until Postgres is Ready, then succeeds. Until the tables exist, the app can answer 500.
+- A plain `helm upgrade` cannot change the existing migration Job (its pod template is immutable). Delete the Job first: `kubectl --context kind-release-notes -n release-notes-test delete job release-notes-migrate`.
+
 ## Repository layout
 
 ```
@@ -109,6 +173,7 @@ migrations/   Alembic migrations (expand-only, safe during a rolling update)
 tests/        pytest suite
 docs/adr/     Architecture decision records
 scripts/      smoke-test.sh: container smoke test
+chart/        Helm chart: app, Postgres, migration Job; ci/ holds the test values
 Dockerfile    The container image
 ```
 
@@ -125,3 +190,5 @@ Dockerfile    The container image
 | [0007](docs/adr/0007-ui-vanilla-js.md) | UI: static files and plain JavaScript on the JSON API, strict CSP |
 | [0008](docs/adr/0008-container-image.md) | Container image: Python slim, two stages, non-root, read-only |
 | [0009](docs/adr/0009-one-image.md) | One image for the app, the migration Job and the UI |
+| [0010](docs/adr/0010-migration-ordering.md) | Migration Job as an Argo CD Sync hook, ordered by sync waves |
+| [0011](docs/adr/0011-database-credentials.md) | Database password from a generated Secret; Kubernetes builds `DATABASE_URL` |
