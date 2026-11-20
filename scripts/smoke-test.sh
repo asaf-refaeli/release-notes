@@ -3,7 +3,7 @@
 # The app's rules are covered by pytest. Usage: scripts/smoke-test.sh <image>
 set -euo pipefail
 
-IMAGE="$1"
+IMAGE="${1:?usage: scripts/smoke-test.sh <image>}"
 POSTGRES_IMAGE="docker.io/library/postgres:18.7-trixie@sha256:e754b839f447639b7004895f4d8a4bfcb4e9dbe3a1bc035f27f646562a16fd61"
 POD="release-notes-it"
 URL="http://127.0.0.1:18080"
