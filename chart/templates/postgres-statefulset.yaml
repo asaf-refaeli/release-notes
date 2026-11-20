@@ -19,8 +19,11 @@ spec:
       app.kubernetes.io/component: database
   template:
     metadata:
+      # Stable labels only: any change to the pod template restarts the only DB pod.
+      # The full labels (app version, chart version) change on every release, so they stay
+      # on the StatefulSet object above, where a change restarts nothing.
       labels:
-        {{- include "release-notes.labels" . | nindent 8 }}
+        {{- include "release-notes.selectorLabels" . | nindent 8 }}
         app.kubernetes.io/component: database
     spec:
       # Postgres never calls the Kubernetes API.
