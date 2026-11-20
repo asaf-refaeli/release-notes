@@ -86,14 +86,14 @@ Tests run against a real Postgres (testcontainers), including the migrations, co
 
 ## Container image
 
-Needs [Buildah](https://buildah.io/), [Podman](https://podman.io/) and `jq` (all rootless, no Docker daemon).
+Needs [Buildah](https://buildah.io/) and [Podman](https://podman.io/) (both rootless, no Docker daemon), plus `curl` and `jq` for the smoke test.
 
 ```bash
 buildah build --layers -t release-notes:local .
 scripts/smoke-test.sh localhost/release-notes:local
 ```
 
-- Two stages on `python:3.14-slim` (pinned by digest): only the locked runtime packages and the app ship; no build tools, no pip.
+- Two stages on `python:3.14.10-slim-trixie` (pinned by digest): only the locked runtime packages and the app ship; no build tools, no pip.
 - Runs as UID 10001 on a read-only filesystem with no capabilities; Uvicorn is PID 1 on port `8080` and finishes in-flight requests for up to 20 s on SIGTERM.
 - The same image runs the migrations: `alembic upgrade head` instead of the default command.
 - The smoke test starts Postgres, the migrations and the app in one Podman pod with those restrictions, then checks readiness, a create and read back, the UI, and a clean exit on SIGTERM. pytest covers the logic; this covers the image.
