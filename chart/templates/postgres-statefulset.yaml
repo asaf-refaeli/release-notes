@@ -1,0 +1,104 @@
+{{- if .Values.postgres.enabled }}
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "release-notes.postgresName" . }}
+  labels:
+    {{- include "release-notes.labels" . | nindent 4 }}
+    app.kubernetes.io/component: database
+  annotations:
+    # First: the migration Job (0) and the app (1) need a ready database, see ADR-0010.
+    argocd.argoproj.io/sync-wave: "-1"
+spec:
+  serviceName: {{ include "release-notes.postgresName" . }}
+  # Always 1: a StatefulSet does not replicate Postgres; 2 would be two separate databases.
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "release-notes.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: database
+  template:
+    metadata:
+      labels:
+        {{- include "release-notes.labels" . | nindent 8 }}
+        app.kubernetes.io/component: database
+    spec:
+      # Postgres never calls the Kubernetes API.
+      automountServiceAccountToken: false
+      {{- with .Values.postgres.podSecurityContext }}
+      securityContext:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: postgres
+          image: "{{ .Values.postgres.image.repository }}:{{ .Values.postgres.image.tag }}@{{ .Values.postgres.image.digest }}"
+          {{- with .Values.postgres.securityContext }}
+          securityContext:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          ports:
+            - name: postgres
+              containerPort: 5432
+              protocol: TCP
+          # Applied only on the first start (empty data folder); later the password lives in the data files.
+          env:
+            - name: POSTGRES_USER
+              value: {{ .Values.database.user | quote }}
+            - name: POSTGRES_DB
+              value: {{ .Values.database.name | quote }}
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.database.existingSecret }}
+                  key: {{ .Values.database.passwordKey }}
+          # -h 127.0.0.1 checks over TCP: during first-start setup the server listens only on the
+          # Unix socket, so a socket check would report ready too early. -U/-d avoid
+          # "role does not exist" noise in the Postgres log.
+          readinessProbe:
+            exec:
+              command: ["pg_isready", "-h", "127.0.0.1", "-U", {{ .Values.database.user | quote }}, "-d", {{ .Values.database.name | quote }}]
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 3
+          # Generous: restart only a database that has been unreachable for a minute.
+          livenessProbe:
+            exec:
+              command: ["pg_isready", "-h", "127.0.0.1", "-U", {{ .Values.database.user | quote }}, "-d", {{ .Values.database.name | quote }}]
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 6
+          {{- with .Values.postgres.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          volumeMounts:
+            # Postgres 18 keeps its data in /var/lib/postgresql/18/docker; mount the parent.
+            - name: data
+              mountPath: /var/lib/postgresql
+            # Writable paths on a read-only root filesystem: the server socket and temp files.
+            - name: run
+              mountPath: /var/run/postgresql
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: run
+          emptyDir: {}
+        - name: tmp
+          emptyDir: {}
+  # One PVC per pod (data-<name>-0). It outlives helm uninstall and the StatefulSet itself.
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+        labels:
+          {{- include "release-notes.selectorLabels" . | nindent 10 }}
+          app.kubernetes.io/component: database
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        {{- with .Values.postgres.storage.storageClassName }}
+        storageClassName: {{ . }}
+        {{- end }}
+        resources:
+          requests:
+            storage: {{ .Values.postgres.storage.size }}
+{{- end }}

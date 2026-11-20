@@ -1,0 +1,23 @@
+{{- if .Values.postgres.enabled }}
+# Headless (no cluster IP): the name resolves straight to the Postgres pod's IP,
+# and only once the pod is Ready.
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "release-notes.postgresName" . }}
+  labels:
+    {{- include "release-notes.labels" . | nindent 4 }}
+    app.kubernetes.io/component: database
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
+spec:
+  clusterIP: None
+  ports:
+    - name: postgres
+      port: 5432
+      targetPort: postgres
+      protocol: TCP
+  selector:
+    {{- include "release-notes.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: database
+{{- end }}

@@ -1,0 +1,2 @@
+# Test case: the chart as it ships (all values from values.yaml).
+# Empty on purpose: once chart/ci/ has files, ct tests only these, so the default case needs its own file.

@@ -1,0 +1,22 @@
+{{- if .Values.serviceMonitor.enabled }}
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: {{ include "release-notes.fullname" . }}
+  labels:
+    {{- include "release-notes.labels" . | nindent 4 }}
+    app.kubernetes.io/component: app
+    {{- with .Values.serviceMonitor.labels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  # Selects the app's Service (not the Postgres one), then scrapes each pod behind it.
+  selector:
+    matchLabels:
+      {{- include "release-notes.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: app
+  endpoints:
+    - port: http
+      path: /metrics
+      interval: {{ .Values.serviceMonitor.interval }}
+{{- end }}

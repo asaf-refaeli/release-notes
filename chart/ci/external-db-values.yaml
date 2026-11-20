@@ -1,0 +1,7 @@
+# Test case: Postgres outside the chart (a managed database in a real cluster).
+# No StatefulSet or headless Service; the app and the migration Job point at database.host.
+postgres:
+  enabled: false
+
+database:
+  host: db.example.com

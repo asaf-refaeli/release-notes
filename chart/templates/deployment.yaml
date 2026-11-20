@@ -1,0 +1,73 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "release-notes.fullname" . }}
+  labels:
+    {{- include "release-notes.labels" . | nindent 4 }}
+    app.kubernetes.io/component: app
+  annotations:
+    # After Postgres (-1) and the migration Job (0), see ADR-0010.
+    argocd.argoproj.io/sync-wave: "1"
+spec:
+  {{- if not .Values.autoscaling.enabled }}
+  replicas: {{ .Values.replicaCount }}
+  {{- end }}
+  revisionHistoryLimit: {{ .Values.revisionHistoryLimit }}
+  {{- with .Values.strategy }}
+  strategy:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "release-notes.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: app
+  template:
+    metadata:
+      labels:
+        {{- include "release-notes.labels" . | nindent 8 }}
+        app.kubernetes.io/component: app
+    spec:
+      serviceAccountName: {{ include "release-notes.fullname" . }}
+      terminationGracePeriodSeconds: {{ .Values.terminationGracePeriodSeconds }}
+      {{- with .Values.podSecurityContext }}
+      securityContext:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: app
+          image: {{ include "release-notes.image" . | quote }}
+          {{- with .Values.securityContext }}
+          securityContext:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          ports:
+            # Fixed by the image's CMD (uvicorn --port 8080), so not a value.
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+          env:
+            - name: APP_VERSION
+              value: {{ include "release-notes.appVersion" . | quote }}
+            - name: LOG_LEVEL
+              value: {{ .Values.logLevel | quote }}
+            - name: DB_POOL_SIZE
+              value: {{ .Values.database.poolSize | quote }}
+            - name: DB_MAX_OVERFLOW
+              value: {{ .Values.database.maxOverflow | quote }}
+            {{- include "release-notes.databaseEnv" . | nindent 12 }}
+          {{- with .Values.livenessProbe }}
+          livenessProbe:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.readinessProbe }}
+          readinessProbe:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.lifecycle }}
+          lifecycle:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}

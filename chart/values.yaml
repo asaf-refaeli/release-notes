@@ -1,0 +1,168 @@
+# Default values for release-notes. The gitops repo overrides these per environment.
+
+image:
+  repository: ghcr.io/asaf-refaeli/release-notes
+  # Set by CI in the gitops repo on each deploy. Empty falls back to Chart.appVersion.
+  tag: ""
+  # Set by CI together with the tag. When set, the image is pulled by digest:
+  # GHCR tags can be re-pushed, a digest cannot change.
+  digest: ""
+
+# Ignored when autoscaling.enabled is true (the HPA owns the replica count).
+replicaCount: 2
+
+# Old ReplicaSets kept for debugging. Rollback is a git revert in the gitops repo, not a ReplicaSet.
+revisionHistoryLimit: 3
+
+service:
+  # Port the Service listens on. It forwards to the container's named port "http" (8080).
+  port: 80
+
+serviceAccount:
+  # For example a cloud identity: eks.amazonaws.com/role-arn
+  annotations: {}
+
+# DEBUG, INFO, WARNING or ERROR (validated by the app at startup).
+logLevel: INFO
+
+# Limits voluntary evictions (node drains, cluster upgrades) to one app pod at a time.
+# maxUnavailable instead of minAvailable: with 1 replica a drain can still evict the pod instead of hanging.
+# No PDB for Postgres: with one pod, the only protective setting (maxUnavailable 0) would block every drain.
+podDisruptionBudget:
+  enabled: true
+  maxUnavailable: 1
+
+# Prometheus Operator scrape config for /metrics. Needs the ServiceMonitor CRD in the cluster.
+serviceMonitor:
+  enabled: false
+  # Labels the Prometheus instance selects on, for example release: kube-prometheus-stack
+  labels: {}
+  interval: 30s
+
+# HPA on CPU (needs metrics-server). When enabled, the HPA owns the replica count.
+autoscaling:
+  enabled: false
+  minReplicas: 2
+  # DB connection budget: (maxReplicas + 1 surge pod) x (poolSize + maxOverflow) + 1 migration Job
+  # must stay below Postgres max_connections (100): (5 + 1) x 15 + 1 = 91.
+  maxReplicas: 5
+  # Percent of resources.requests.cpu, averaged over all pods.
+  targetCPUUtilizationPercentage: 70
+
+# The image runs as USER 10001. runAsNonRoot needs a numeric UID to verify it.
+podSecurityContext:
+  runAsUser: 10001
+  runAsGroup: 10001
+  runAsNonRoot: true
+  seccompProfile:
+    type: RuntimeDefault
+
+# Same restrictions the container smoke test runs with.
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop:
+      - ALL
+
+# Starting estimates; tune from observed usage. No CPU limit (avoids throttling);
+# the memory limit stops a leak from hurting the node.
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    memory: 256Mi
+
+# Liveness never touches the database, so a DB outage never restarts the app.
+livenessProbe:
+  httpGet:
+    path: /healthz/live
+    port: http
+  periodSeconds: 10
+  failureThreshold: 3
+
+# Readiness runs SELECT 1. timeoutSeconds is above the app's 2 s DB connect timeout,
+# so a slow connect reports "not ready" instead of a probe timeout.
+readinessProbe:
+  httpGet:
+    path: /healthz/ready
+    port: http
+  periodSeconds: 5
+  timeoutSeconds: 3
+  failureThreshold: 3
+
+# Rollout: a new pod must be Ready before an old one stops. Proven by the rollout check.
+strategy:
+  type: RollingUpdate
+  rollingUpdate:
+    maxUnavailable: 0
+    maxSurge: 1
+
+# Keeps the old pod serving while it is removed from the Service endpoints; SIGTERM comes after.
+# Built-in sleep action (Kubernetes 1.30+), the image has no shell.
+lifecycle:
+  preStop:
+    sleep:
+      seconds: 5
+
+# Must exceed the preStop sleep plus Uvicorn's --timeout-graceful-shutdown (20 s).
+terminationGracePeriodSeconds: 30
+
+# Job running "alembic upgrade head" with the app image, as an Argo CD Sync hook (ADR-0010).
+migration:
+  # Retries after a failure (10 s, 20 s, 40 s backoff). Under Argo CD the database is already
+  # ready, so a failure is a real migration error and should fail the sync quickly.
+  backoffLimit: 3
+  # Hard cap: a migration stuck on a lock fails instead of holding the sync forever.
+  activeDeadlineSeconds: 300
+
+# How the app and the migration Job connect to Postgres. The Postgres in this chart
+# reads the same user, name and Secret, so both sides always match.
+database:
+  # Empty: the Postgres in this chart (<fullname>-postgres). Set it to use an external database.
+  host: ""
+  port: 5432
+  name: release_notes
+  user: app
+  # Secret with the password, created outside the chart (never in Git).
+  existingSecret: release-notes-db
+  # The password is placed inside DATABASE_URL, so it must be letters and digits only.
+  passwordKey: password
+  # Connections per app pod: poolSize + maxOverflow (app defaults 5 + 10).
+  # See autoscaling.maxReplicas for the connection budget.
+  poolSize: 5
+  maxOverflow: 10
+
+# The Postgres server inside this chart. Disable it to use an external database (set database.host).
+postgres:
+  enabled: true
+  # Same pin as scripts/smoke-test.sh.
+  image:
+    repository: docker.io/library/postgres
+    tag: 18.7-trixie
+    digest: sha256:e754b839f447639b7004895f4d8a4bfcb4e9dbe3a1bc035f27f646562a16fd61
+  storage:
+    size: 1Gi
+    # Empty: the cluster's default StorageClass.
+    storageClassName: ""
+  # UID/GID 999 is the postgres user in the official image. fsGroup makes the volume writable for it.
+  podSecurityContext:
+    runAsUser: 999
+    runAsGroup: 999
+    fsGroup: 999
+    runAsNonRoot: true
+    seccompProfile:
+      type: RuntimeDefault
+  securityContext:
+    allowPrivilegeEscalation: false
+    readOnlyRootFilesystem: true
+    capabilities:
+      drop:
+        - ALL
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      memory: 512Mi
