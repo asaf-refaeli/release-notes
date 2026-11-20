@@ -2,7 +2,7 @@
 
 A small internal service for recording what shipped in each release: a FastAPI API on Postgres, with a draft → published → archived lifecycle and an audit trail of every change.
 
-> **Status:** home assignment, in progress. Built: the service with health checks, structured logs, metrics, the release lifecycle, the audit trail and a UI for all of it. Next: a container image, a Helm chart, CI/CD and a zero-downtime rollout.
+> **Status:** home assignment, in progress. Built: the service with health checks, structured logs, metrics, the release lifecycle, the audit trail, a UI for all of it, and a hardened container image. Next: a Helm chart, CI/CD and a zero-downtime rollout.
 
 ## Quickstart
 
@@ -84,6 +84,22 @@ uv run ruff check . && uv run ruff format --check .    # lint and format
 
 Tests run against a real Postgres (testcontainers), including the migrations, concurrent publishes, and an audit-trail rollback check.
 
+## Container image
+
+Needs [Buildah](https://buildah.io/), [Podman](https://podman.io/) and `jq` (all rootless, no Docker daemon).
+
+```bash
+buildah build --layers -t release-notes:local .
+scripts/smoke-test.sh localhost/release-notes:local
+```
+
+- Two stages on `python:3.14-slim` (pinned by digest): only the locked runtime packages and the app ship; no build tools, no pip.
+- Runs as UID 10001 on a read-only filesystem with no capabilities; Uvicorn is PID 1 on port `8080` and finishes in-flight requests for up to 20 s on SIGTERM.
+- The same image runs the migrations: `alembic upgrade head` instead of the default command.
+- The smoke test starts Postgres, the migrations and the app in one Podman pod with those restrictions, then checks readiness, a create and read back, the UI, and a clean exit on SIGTERM. pytest covers the logic; this covers the image.
+
+See [ADR-0008](docs/adr/0008-container-image.md) and [ADR-0009](docs/adr/0009-one-image.md).
+
 ## Repository layout
 
 ```
@@ -92,6 +108,8 @@ app/static/   The UI: index.html, app.js, app.css (no build step; security heade
 migrations/   Alembic migrations (expand-only, safe during a rolling update)
 tests/        pytest suite
 docs/adr/     Architecture decision records
+scripts/      smoke-test.sh: container smoke test
+Dockerfile    The container image
 ```
 
 ## Decisions
@@ -105,3 +123,5 @@ docs/adr/     Architecture decision records
 | [0005](docs/adr/0005-concurrent-writes.md) | Row lock plus a partial unique index for concurrent writes |
 | [0006](docs/adr/0006-tests-on-real-postgres.md) | Tests run against a real Postgres through testcontainers |
 | [0007](docs/adr/0007-ui-vanilla-js.md) | UI: static files and plain JavaScript on the JSON API, strict CSP |
+| [0008](docs/adr/0008-container-image.md) | Container image: Python slim, two stages, non-root, read-only |
+| [0009](docs/adr/0009-one-image.md) | One image for the app, the migration Job and the UI |

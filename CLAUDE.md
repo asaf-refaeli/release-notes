@@ -16,11 +16,11 @@ The plan lives outside this repo in `../docs/project-plan.md`.
 - Lint and format: `uv run ruff check . && uv run ruff format --check .`
 - Migrations: `uv run alembic upgrade head` (needs `DATABASE_URL`)
 - Runtime: Python 3.14, pinned in `.python-version`
+- Build the image: `buildah build --layers -t release-notes:local .` (rootless Buildah; Docker cannot see the result, Podman can). The container runs `uvicorn` directly (exec-form `CMD`, port `8080`), so it is PID 1 and receives SIGTERM for graceful shutdown.
+- Container smoke test: `scripts/smoke-test.sh localhost/release-notes:local` (needs Podman, curl, jq)
 
-Planned, not built yet (move each line up when its step lands):
-- Build the image: `buildah bud -t release-notes:local .` (step 5). The container runs `uvicorn` directly (exec-form `CMD`, port `8080`), so it is PID 1 and receives SIGTERM for graceful shutdown.
-- Container integration test: `scripts/integration-test.sh <image>` (step 5)
-- Rollout check: `uv run scripts/rollout_check.py --url <base-url>` (step 9)
+Planned, not built yet (move each line up when it lands):
+- Rollout check: `uv run scripts/rollout_check.py --url <base-url>`
 
 ## Architecture
 
@@ -37,6 +37,9 @@ Planned, not built yet (move each line up when its step lands):
 - `app/service.py`: business rules and the `DomainError` exceptions; `_lock_release` (row lock) and `_record_event` are used by every lifecycle write; no HTTP code here
 - `app/api.py`: `/api/releases` routes; thin, each calls one service function
 - `migrations/`: Alembic; migrations must be expand-only so old pods keep working during a rollout. `env.py` reads `DATABASE_URL` via `get_settings()`; constraint names follow the naming convention on `Base`.
+- `Dockerfile`: two stages on `python:3.14.10-slim-trixie` (tag + digest). The builder copies `pyproject.toml` + `uv.lock` and runs `uv sync --locked --no-dev`; the runtime copies the venv, `alembic.ini`, `migrations/` and `app/`, removes pip, runs as `USER 10001` with root-owned files (ADR-0008). The same image runs the migration Job (`alembic upgrade head`) (ADR-0009). Keep `pyproject.toml` and `uv.lock` as a `COPY`, not a bind mount: Buildah's layer cache ignores bind-mounted file contents.
+- `.dockerignore`: `.git`, `.venv`, `__pycache__`, `.env*`; the `COPY` lines name every path the image needs, never `COPY . .`.
+- `scripts/smoke-test.sh`: container smoke test (bash). Runs Postgres, the migrations and the app in one Podman pod with the Kubernetes restrictions (read-only with no `/tmp`, no capabilities, no `--user` so the image's own user is checked), then checks readiness, create + read back, the UI, and exit code 0 on SIGTERM.
 - `tests/conftest.py`: shared fixtures: one Postgres container and `alembic upgrade head` per run; `db_client` truncates all tables and points the app at the test DB for each test.
 
 Rules:
@@ -47,7 +50,7 @@ Rules:
 - UI: user data reaches the page only through `textContent` (never `innerHTML` and similar); no inline `<script>`, `style=` or `on*=` (the CSP blocks them); API URLs in JS are relative; no CDN, no build step. Element ids are the contract between `index.html` and `app.js` (a test checks them).
 
 ## Decisions
-Decisions are documented as ADRs in `docs/adr/` using `docs/adr/0000-template.md` (`DECISIONS.md` index comes in step 0, before CI).
+Decisions are documented as ADRs in `docs/adr/` using `docs/adr/0000-template.md` (a `DECISIONS.md` index comes before CI).
 Their purpose is to explain why each choice was made.
 - Use GitHub Flow as git workflow
 - Use GitHub Actions for CI
@@ -56,6 +59,8 @@ Their purpose is to explain why each choice was made.
 - Concurrent writes: row lock plus a partial unique index (ADR-0005)
 - Tests run against a real Postgres through testcontainers (ADR-0006)
 - UI: static files and plain JavaScript on the JSON API, strict CSP (ADR-0007)
+- Container image: Python slim, two stages, non-root, read-only (ADR-0008)
+- One image for the app, the migration Job and the UI (ADR-0009)
 <!-- Add each decision here once it's made. Until something is listed, ask before choosing. -->
 
 ## Conventions
