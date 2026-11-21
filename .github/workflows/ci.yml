@@ -78,3 +78,42 @@ jobs:
         uses: github/codeql-action/upload-sarif@33d7b85da1a04171e211befe2c739303b9a4c066 # v4.39.3
         with:
           sarif_file: semgrep.sarif
+
+  helm:
+    runs-on: ubuntu-latest
+    container: quay.io/helmpack/chart-testing:v3.15.0@sha256:54317f2d93730ea9ca1236e3d79cd95d74110b8d733b6ab124e5829209b5f4e4
+    env:
+      KUBECONFORM_VERSION: v0.8.0
+      KUBECONFORM_SHA256: 9bc2bffbf71f261128533edaf912153948b7ff238f9a531ae6d34466ec287883
+    defaults:
+      run:
+        shell: bash
+    steps:
+      # Full history so ct can diff against main to find changed charts
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      # The container runs as a different user than the checkout owner; git refuses such repos by default
+      - name: Trust the checkout for git
+        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
+
+      # Lints changed charts with each chart/ci/*-values.yaml. Version bump check off: release-please bumps the chart
+      - name: Chart lint (ct)
+        run: ct lint --chart-dirs . --target-branch main --validate-maintainers=false --check-version-increment=false
+
+      - name: Install kubeconform
+        run: |
+          curl -fsSLo kubeconform.tar.gz "https://github.com/yannh/kubeconform/releases/download/${KUBECONFORM_VERSION}/kubeconform-linux-amd64.tar.gz"
+          echo "${KUBECONFORM_SHA256}  kubeconform.tar.gz" | sha256sum -c -
+          tar xzf kubeconform.tar.gz -C /usr/local/bin kubeconform
+
+      # Second schema location covers CRDs such as ServiceMonitor and HTTPRoute
+      - name: Validate rendered manifests (kubeconform)
+        run: |
+          for f in chart/ci/*-values.yaml; do
+            echo "== $f"
+            helm template ci chart -f "$f" | kubeconform -strict -summary \
+              -schema-location default \
+              -schema-location 'https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json'
+          done
