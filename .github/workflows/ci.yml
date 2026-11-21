@@ -130,3 +130,95 @@ jobs:
               -schema-location default \
               -schema-location 'https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json'
           done
+
+  # Builds and tests the image. Runs PR code (smoke test), so it gets no packages: write;
+  # the push is a separate main-only job.
+  image:
+    needs: [lint, test, sast]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    env:
+      IMAGE: localhost/release-notes:${{ github.sha }}
+      TRIVY_IMAGE: docker.io/aquasec/trivy:0.76.2@sha256:8f6bb947dbc528902e11f2f5be52f7b519f6a39d5d148f41166f2040499768fb
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # The source label links the GHCR package to this repo
+      - name: Build image (Buildah)
+        run: >-
+          buildah build
+          --label "org.opencontainers.image.source=$GITHUB_SERVER_URL/$GITHUB_REPOSITORY"
+          -t "$IMAGE" .
+
+      - name: Smoke test
+        run: scripts/smoke-test.sh "$IMAGE"
+
+      # Trivy reads the saved file, so no container engine socket is needed
+      - name: Save image
+        run: |
+          podman save -o image.tar "$IMAGE"
+          mkdir -p "$HOME/.cache/trivy"
+
+      - name: Trivy scan (fail on HIGH/CRITICAL)
+        run: >-
+          podman run --rm
+          -v "$PWD:/work" -v "$HOME/.cache/trivy:/root/.cache/trivy"
+          "$TRIVY_IMAGE" image --input /work/image.tar
+          --severity HIGH,CRITICAL --exit-code 1
+
+      # Runs even when the scan fails, so findings still reach the Security tab; reuses the cached DB
+      - name: Trivy SARIF report
+        if: success() || failure()
+        run: >-
+          podman run --rm
+          -v "$PWD:/work" -v "$HOME/.cache/trivy:/root/.cache/trivy"
+          "$TRIVY_IMAGE" image --input /work/image.tar
+          --severity HIGH,CRITICAL --format sarif --output /work/trivy.sarif
+
+      - name: Upload results to Security tab
+        if: success() || failure()
+        uses: github/codeql-action/upload-sarif@33d7b85da1a04171e211befe2c739303b9a4c066 # v4.39.3
+        with:
+          sarif_file: trivy.sarif
+          category: trivy
+
+      # Hands the tested image to the push job; only main pushes
+      - name: Upload image for the push job
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: image
+          path: image.tar
+          retention-days: 1
+
+  # The only job with packages: write. Main only, no checkout: it runs no repository code,
+  # so code from a PR never runs where the push token exists.
+  push:
+    needs: image
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      packages: write
+    outputs:
+      tag: ${{ steps.push.outputs.tag }}
+      digest: ${{ steps.push.outputs.digest }}
+    steps:
+      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
+        with:
+          name: image
+
+      # Pushes the same image that was tested; the digest is what deployments pin
+      - name: Push to GHCR
+        id: push
+        env:
+          REGISTRY_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          repo="ghcr.io/${GITHUB_REPOSITORY,,}"
+          tag="sha-${GITHUB_SHA::7}"
+          echo "$REGISTRY_TOKEN" | skopeo login --username "$GITHUB_ACTOR" --password-stdin ghcr.io
+          skopeo copy --digestfile digest.txt docker-archive:image.tar "docker://$repo:$tag"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "digest=$(cat digest.txt)" >> "$GITHUB_OUTPUT"
+          echo "Pushed $repo:$tag@$(cat digest.txt)"
