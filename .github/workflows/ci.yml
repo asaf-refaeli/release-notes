@@ -183,3 +183,42 @@ jobs:
         with:
           sarif_file: trivy.sarif
           category: trivy
+
+      # Hands the tested image to the push job; only main pushes
+      - name: Upload image for the push job
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: image
+          path: image.tar
+          retention-days: 1
+
+  # The only job with packages: write. Main only, no checkout: it runs no repository code,
+  # so code from a PR never runs where the push token exists.
+  push:
+    needs: image
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      packages: write
+    outputs:
+      tag: ${{ steps.push.outputs.tag }}
+      digest: ${{ steps.push.outputs.digest }}
+    steps:
+      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
+        with:
+          name: image
+
+      # Pushes the same image that was tested; the digest is what deployments pin
+      - name: Push to GHCR
+        id: push
+        env:
+          REGISTRY_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          repo="ghcr.io/${GITHUB_REPOSITORY,,}"
+          tag="sha-${GITHUB_SHA::7}"
+          echo "$REGISTRY_TOKEN" | skopeo login --username "$GITHUB_ACTOR" --password-stdin ghcr.io
+          skopeo copy --digestfile digest.txt docker-archive:image.tar "docker://$repo:$tag"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "digest=$(cat digest.txt)" >> "$GITHUB_OUTPUT"
+          echo "Pushed $repo:$tag@$(cat digest.txt)"
