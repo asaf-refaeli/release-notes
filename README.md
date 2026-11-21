@@ -93,7 +93,7 @@ buildah build --layers -t release-notes:local .
 scripts/smoke-test.sh localhost/release-notes:local
 ```
 
-- Two stages on `python:3.14.10-slim-trixie` (pinned by digest): only the locked runtime packages and the app ship; no build tools, no pip.
+- Two stages on `python:3.14.10-alpine3.24` (pinned by digest): only the locked runtime packages and the app ship; no build tools, no pip.
 - Runs as UID 10001 on a read-only filesystem with no capabilities; Uvicorn is PID 1 on port `8080` and finishes in-flight requests for up to 20 s on SIGTERM.
 - The same image runs the migrations: `alembic upgrade head` instead of the default command.
 - The smoke test starts Postgres, the migrations and the app in one Podman pod with those restrictions, then checks readiness, a create and read back, the UI, and a clean exit on SIGTERM. pytest covers the logic; this covers the image.
@@ -197,7 +197,7 @@ Dockerfile    The container image
 | [0005](docs/adr/0005-concurrent-writes.md) | Row lock plus a partial unique index for concurrent writes |
 | [0006](docs/adr/0006-tests-on-real-postgres.md) | Tests run against a real Postgres through testcontainers |
 | [0007](docs/adr/0007-ui-vanilla-js.md) | UI: static files and plain JavaScript on the JSON API, strict CSP |
-| [0008](docs/adr/0008-container-image.md) | Container image: Python slim, two stages, non-root, read-only |
+| [0008](docs/adr/0008-container-image.md) | Container image: Python on Alpine, two stages, non-root, read-only |
 | [0009](docs/adr/0009-one-image.md) | One image for the app, the migration Job and the UI |
 | [0010](docs/adr/0010-migration-ordering.md) | Migration Job as an Argo CD Sync hook, ordered by sync waves |
 | [0011](docs/adr/0011-database-credentials.md) | Database password Secret generated in the cluster by a PreSync Job; Kubernetes builds `DATABASE_URL` |
