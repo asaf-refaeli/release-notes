@@ -8,7 +8,7 @@
 ## Decision
 - **Bootstrap:** `scripts/bootstrap.sh` runs `helm install` for Argo CD once, then applies one root Application. These are the only imperative steps. The DB Secret is created in the cluster by the chart (ADR-0011).
 - **App of apps with plain Application files:** root syncs `bootstrap/`. That folder holds two AppProjects and one Application file per component: argocd, gateway-api, traefik, metrics-server, release-notes-dev, release-notes-prod. Root sits inside the folder it syncs, so it is managed from Git too.
-- **Order by sync waves between Applications:** projects `-1`, then argocd and gateway-api `0`, then traefik and metrics-server `1`, then the app `2`. An Argo CD health check for `Application` makes each wave wait until the previous one is Healthy.
+- **Order by sync waves between Applications:** projects `-1`, then argocd, gateway-api and metrics-server `0`, then traefik `1`, then the app `2`. An Argo CD health check for `Application` makes each wave wait until the previous one is Healthy.
 - **Self-managed Argo CD:** the `argocd` Application points at the same wrapper chart (`workloads/platform/argocd`), with the same release name, that the bootstrap installed. It adopts the install, so Argo CD upgrades and config changes are commits. It has no cascade-delete finalizer, so deleting the Application never deletes Argo CD.
 - **Two AppProjects:**
   - `platform`: this repo only. Its destinations are argocd, traefik and kube-system, with an explicit list of allowed cluster-scoped kinds.
