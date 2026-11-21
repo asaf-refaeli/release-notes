@@ -2,12 +2,12 @@
 
 ## Context
 - The app needs separate settings for at least two environments without duplicating manifests.
-- Everything runs on one local kind cluster, deployed by Argo CD from the `gitops` repo.
+- Everything runs on one local kind cluster, deployed by Argo CD from the `kind-gitops` repo.
 - One Argo CD Application renders one Helm release with one merged set of values, so one Application cannot run two environments.
 
 ## Decision
 Two environments, dev and prod, both deployed, each in its own namespace (`release-notes-dev`, `release-notes-prod`):
-- One chart (this repo). The environment differences live only in `gitops/workloads/apps/release-notes/values-dev.yaml` and `values-prod.yaml`: replicas and HPA, PDB, log level, resources, hostname, storage size.
+- One chart (this repo). The environment differences live only in `kind-gitops/workloads/apps/release-notes/values-dev.yaml` and `values-prod.yaml`: replicas and HPA, PDB, log level, resources, hostname, storage size.
 - Two plain Application files that differ only in name, namespace and values file.
 - Both environments run the same image. CI writes the new tag and digest to both values files in one commit, so one revert rolls both back. There is no promotion flow.
 - Namespaces stand in for clusters. In production each environment would be its own cluster, and only the Application's `destination.server` would change.

@@ -1,8 +1,8 @@
-# Default values for release-notes. The gitops repo overrides these per environment.
+# Default values for release-notes. The kind-gitops repo overrides these per environment.
 
 image:
   repository: ghcr.io/asaf-refaeli/release-notes
-  # Set by CI in the gitops repo on each deploy. Empty falls back to Chart.appVersion.
+  # Set by CI in the kind-gitops repo on each deploy. Empty falls back to Chart.appVersion.
   tag: ""
   # Set by CI together with the tag. When set, the image is pulled by digest:
   # GHCR tags can be re-pushed, a digest cannot change.
@@ -11,7 +11,7 @@ image:
 # Ignored when autoscaling.enabled is true (the HPA owns the replica count).
 replicaCount: 2
 
-# Old ReplicaSets kept for debugging. Rollback is a git revert in the gitops repo, not a ReplicaSet.
+# Old ReplicaSets kept for debugging. Rollback is a git revert in the kind-gitops repo, not a ReplicaSet.
 revisionHistoryLimit: 3
 
 service:

@@ -102,7 +102,7 @@ See [ADR-0008](docs/adr/0008-container-image.md) and [ADR-0009](docs/adr/0009-on
 
 ## Helm chart
 
-`chart/` deploys the app, its Postgres and the schema migration. Argo CD installs it from the [gitops](https://github.com/asaf-refaeli/gitops) repo, which holds the per-environment values.
+`chart/` deploys the app, its Postgres and the schema migration. Argo CD installs it from the [kind-gitops](https://github.com/asaf-refaeli/kind-gitops) repo, which holds the per-environment values.
 
 | Resources | What they do |
 |---|---|
