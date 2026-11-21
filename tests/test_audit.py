@@ -8,6 +8,8 @@ from app import service
 from app.models import ReleaseEvent
 from tests.utils import create_draft, event_types
 
+pytestmark = pytest.mark.medium
+
 
 def test_create_writes_created_event(db_client):
     release = db_client.post("/api/releases", json={"version": "1.0.0"}).json()

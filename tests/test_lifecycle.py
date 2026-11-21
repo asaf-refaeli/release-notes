@@ -4,6 +4,8 @@ import pytest
 
 from tests.utils import create_draft, create_published, event_types
 
+pytestmark = pytest.mark.medium
+
 
 def test_patch_draft_updates_fields(db_client):
     release = create_draft(db_client)

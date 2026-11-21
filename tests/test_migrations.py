@@ -1,8 +1,11 @@
+import pytest
 from alembic.autogenerate import compare_metadata
 from alembic.migration import MigrationContext
 from sqlalchemy import create_engine, inspect
 
 from app.models import Base
+
+pytestmark = pytest.mark.medium
 
 
 def test_migrations_match_models(migrated_url):

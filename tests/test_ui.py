@@ -6,6 +6,9 @@ from fastapi.testclient import TestClient
 from app.main import app
 from app.ui import CONTENT_SECURITY_POLICY, STATIC_DIR
 
+# Medium, not small: the tests read the static files from disk.
+pytestmark = pytest.mark.medium
+
 client = TestClient(app)
 
 

@@ -1,4 +1,7 @@
+import pytest
 from sqlalchemy import text
+
+pytestmark = pytest.mark.medium
 
 
 def test_create_release_saves_to_database(db_client, test_engine):
