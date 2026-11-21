@@ -110,6 +110,7 @@ See [ADR-0008](docs/adr/0008-container-image.md) and [ADR-0009](docs/adr/0009-on
 | HorizontalPodAutoscaler | On CPU, off by default (`autoscaling.enabled`, needs metrics-server). When on, it owns the replica count. |
 | PodDisruptionBudget | On by default, `maxUnavailable: 1`: a node drain evicts one app pod at a time. |
 | ServiceMonitor | Off by default (`serviceMonitor.enabled`, needs the Prometheus Operator CRD); scrapes `/metrics`. |
+| HTTPRoute | Off by default (`route.enabled`, needs Gateway API CRDs and a Gateway that allows the namespace). `route.hostname` -> the app Service; `route.gateway.name`/`namespace` picks the Gateway. |
 | StatefulSet, headless Service, PVC | Postgres 18 pinned by digest, one pod, UID 999, read-only root filesystem, a 1Gi PVC on the default StorageClass. Off with `postgres.enabled: false`. |
 | Job | `alembic upgrade head` with the app image, as an Argo CD `Sync` hook. |
 | Job, ServiceAccount, Role, RoleBinding | Creates the database password Secret if it is missing, as Argo CD `PreSync` hooks. Off with `database.createSecret.enabled: false`. |

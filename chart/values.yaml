@@ -18,6 +18,17 @@ service:
   # Port the Service listens on. It forwards to the container's named port "http" (8080).
   port: 80
 
+# HTTPRoute (Gateway API): the way in from outside the cluster. Needs a Gateway API controller
+# (Traefik here) and a Gateway that allows this namespace. Off for a plain install.
+route:
+  enabled: false
+  # Host header this route answers, e.g. prod.localhost.
+  hostname: ""
+  # The Gateway to attach to, owned by the platform. An empty namespace means this release's.
+  gateway:
+    name: ""
+    namespace: ""
+
 serviceAccount:
   # For example a cloud identity: eks.amazonaws.com/role-arn
   annotations: {}

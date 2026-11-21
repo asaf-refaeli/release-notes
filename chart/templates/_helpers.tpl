@@ -52,6 +52,9 @@ with a message, so a bad combination is caught by lint, CI or Argo CD before any
 {{- if and .Values.autoscaling.enabled (gt (int .Values.autoscaling.minReplicas) (int .Values.autoscaling.maxReplicas)) }}
 {{- fail (printf "autoscaling.minReplicas (%v) is greater than autoscaling.maxReplicas (%v)" .Values.autoscaling.minReplicas .Values.autoscaling.maxReplicas) }}
 {{- end }}
+{{- if and .Values.route.enabled (not (and .Values.route.hostname .Values.route.gateway.name)) }}
+{{- fail "route.enabled is true: set route.hostname and route.gateway.name (and route.gateway.namespace if the Gateway is in another namespace)" }}
+{{- end }}
 {{- if .Values.postgres.enabled }}
 {{- /* Most app pods at once: the HPA max, or replicaCount without an HPA. During a rollout add
        1 surge pod and 1 old pod still shutting down (it keeps its pool for up to the 25 s drain). */}}

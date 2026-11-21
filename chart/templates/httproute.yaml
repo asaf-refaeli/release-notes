@@ -1,0 +1,26 @@
+{{- if .Values.route.enabled }}
+# Routes the hostname to this chart's Service through the platform's Gateway (Traefik).
+# The Gateway decides the port and which namespaces may attach; this route only says
+# "requests for this host go to my Service".
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: {{ include "release-notes.fullname" . }}
+  labels:
+    {{- include "release-notes.labels" . | nindent 4 }}
+    app.kubernetes.io/component: app
+spec:
+  parentRefs:
+    - name: {{ .Values.route.gateway.name }}
+      {{- /* Empty: a Gateway in this release's namespace. */}}
+      {{- with .Values.route.gateway.namespace }}
+      namespace: {{ . }}
+      {{- end }}
+  hostnames:
+    - {{ .Values.route.hostname | quote }}
+  rules:
+    # No matches: every path on this host. The proxy picks a Ready pod per request.
+    - backendRefs:
+        - name: {{ include "release-notes.fullname" . }}
+          port: {{ .Values.service.port }}
+{{- end }}
