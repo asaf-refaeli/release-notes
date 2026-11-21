@@ -6,6 +6,10 @@ metadata:
   labels:
     {{- include "release-notes.labels" . | nindent 4 }}
     app.kubernetes.io/component: app
+  annotations:
+    # After the Deployment (wave 1). The HPA reads its target's scale; with the target missing,
+    # Argo CD reports the HPA Degraded, the wave fails, and the Deployment is never created.
+    argocd.argoproj.io/sync-wave: "2"
 spec:
   scaleTargetRef:
     apiVersion: apps/v1

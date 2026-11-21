@@ -115,7 +115,7 @@ See [ADR-0008](docs/adr/0008-container-image.md) and [ADR-0009](docs/adr/0009-on
 | Job | `alembic upgrade head` with the app image, as an Argo CD `Sync` hook. |
 | Job, ServiceAccount, Role, RoleBinding | Creates the database password Secret if it is missing, as Argo CD `PreSync` hooks. Off with `database.createSecret.enabled: false`. |
 
-**Order ([ADR-0010](docs/adr/0010-migration-ordering.md)):** Argo CD sync waves run Postgres (`-1`), then the migration Job (`0`), then the app Deployment (`1`). Each wave waits for the previous one to be healthy, so a failed migration stops the sync before any new app pod starts.
+**Order ([ADR-0010](docs/adr/0010-migration-ordering.md)):** Argo CD sync waves run Postgres (`-1`), then the migration Job (`0`), then the app Deployment (`1`), then the HPA (`2`, it needs its target Deployment to exist). Each wave waits for the previous one to be healthy, so a failed migration stops the sync before any new app pod starts.
 
 **Database values:** `database` says how the app and the Job connect (host, port, name, user, Secret, pool size). `postgres` configures the Postgres server in the chart (image, storage, security context, resources); it reads the same user, name and Secret, so both sides always match. For an external database, set `postgres.enabled=false` and `database.host`; without a host the render fails.
 
