@@ -41,7 +41,7 @@ Planned, not built yet (move each line up when it lands):
 - `app/service.py`: business rules and the `DomainError` exceptions; `_lock_release` (row lock) and `_record_event` are used by every lifecycle write; no HTTP code here
 - `app/api.py`: `/api/releases` routes; thin, each calls one service function
 - `migrations/`: Alembic; migrations must be expand-only so old pods keep working during a rollout. `env.py` reads `DATABASE_URL` via `get_settings()`; constraint names follow the naming convention on `Base`.
-- `Dockerfile`: two stages on `python:3.14.10-slim-trixie` (tag + digest). The builder copies `pyproject.toml` + `uv.lock` and runs `uv sync --locked --no-dev`; the runtime copies the venv, `alembic.ini`, `migrations/` and `app/`, removes pip, runs as `USER 10001` with root-owned files (ADR-0008). The same image runs the migration Job (`alembic upgrade head`) (ADR-0009). Keep `pyproject.toml` and `uv.lock` as a `COPY`, not a bind mount: Buildah's layer cache ignores bind-mounted file contents.
+- `Dockerfile`: two stages on `python:3.14.10-alpine3.24` (tag + digest; musl, not glibc). The builder copies `pyproject.toml` + `uv.lock` and runs `uv sync --locked --no-dev`; the runtime copies the venv, `alembic.ini`, `migrations/` and `app/`, removes pip, runs as `USER 10001` with root-owned files (ADR-0008). The same image runs the migration Job (`alembic upgrade head`) (ADR-0009). Keep `pyproject.toml` and `uv.lock` as a `COPY`, not a bind mount: Buildah's layer cache ignores bind-mounted file contents.
 - `.dockerignore`: `.git`, `.venv`, `__pycache__`, `.env*`; the `COPY` lines name every path the image needs, never `COPY . .`.
 - `scripts/smoke-test.sh`: container smoke test (bash). Runs Postgres, the migrations and the app in one Podman pod with the Kubernetes restrictions (read-only with no `/tmp`, no capabilities, no `--user` so the image's own user is checked), then checks readiness, create + read back, the UI, and exit code 0 on SIGTERM.
 - `tests/conftest.py`: shared fixtures: one Postgres container and `alembic upgrade head` per run; `db_client` truncates all tables and points the app at the test DB for each test.
@@ -72,7 +72,7 @@ Their purpose is to explain why each choice was made.
 - Concurrent writes: row lock plus a partial unique index (ADR-0005)
 - Tests run against a real Postgres through testcontainers (ADR-0006)
 - UI: static files and plain JavaScript on the JSON API, strict CSP (ADR-0007)
-- Container image: Python slim, two stages, non-root, read-only (ADR-0008)
+- Container image: Python on Alpine, two stages, non-root, read-only (ADR-0008)
 - One image for the app, the migration Job and the UI (ADR-0009)
 - Migration ordering: Argo CD Sync hook and sync waves, DB -1, Job 0, app 1 (ADR-0010)
 - Database credentials: Secret generated in the cluster by a PreSync Job in the chart, Kubernetes builds `DATABASE_URL` (ADR-0011)
