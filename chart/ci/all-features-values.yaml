@@ -18,3 +18,10 @@ serviceAccount:
 postgres:
   storage:
     storageClassName: standard
+
+route:
+  enabled: true
+  hostname: release-notes.example.com
+  gateway:
+    name: web
+    namespace: gateway-system

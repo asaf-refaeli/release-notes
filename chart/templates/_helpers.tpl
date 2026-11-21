@@ -45,8 +45,15 @@ with a message, so a bad combination is caught by lint, CI or Argo CD before any
 {{- if and .Values.database.host .Values.postgres.enabled }}
 {{- fail "database.host is set but postgres.enabled is true: set postgres.enabled=false to use an external database" }}
 {{- end }}
+{{- /* A random password is useless for a database this chart does not run. */}}
+{{- if and .Values.database.host .Values.database.createSecret.enabled }}
+{{- fail "database.host is set but database.createSecret.enabled is true: an external database needs its real password in database.existingSecret; set database.createSecret.enabled=false" }}
+{{- end }}
 {{- if and .Values.autoscaling.enabled (gt (int .Values.autoscaling.minReplicas) (int .Values.autoscaling.maxReplicas)) }}
 {{- fail (printf "autoscaling.minReplicas (%v) is greater than autoscaling.maxReplicas (%v)" .Values.autoscaling.minReplicas .Values.autoscaling.maxReplicas) }}
+{{- end }}
+{{- if and .Values.route.enabled (not (and .Values.route.hostname .Values.route.gateway.name)) }}
+{{- fail "route.enabled is true: set route.hostname and route.gateway.name (and route.gateway.namespace if the Gateway is in another namespace)" }}
 {{- end }}
 {{- if .Values.postgres.enabled }}
 {{- /* Most app pods at once: the HPA max, or replicaCount without an HPA. During a rollout add
