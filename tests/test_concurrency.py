@@ -8,6 +8,8 @@ from app.schemas import ReleaseUpdate
 from app.service import DomainError, publish_release, update_release
 from tests.utils import create_draft, event_types
 
+pytestmark = pytest.mark.medium
+
 
 def run_concurrently(engine, *actions):
     """Run each action(session) in its own thread and session, all at the same moment.

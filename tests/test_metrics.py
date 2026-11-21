@@ -7,6 +7,8 @@ from sqlalchemy.exc import DBAPIError
 
 from app.db import get_engine
 
+pytestmark = pytest.mark.medium
+
 
 def test_pool_gauges_follow_the_real_pool(migrated_url, monkeypatch):
     # The real get_engine(), as in production, pointed at the test DB.

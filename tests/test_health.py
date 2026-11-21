@@ -16,6 +16,7 @@ def dead_database():
     app.dependency_overrides.clear()
 
 
+@pytest.mark.small
 def test_live_returns_ok():
     response = client.get("/healthz/live")
 
@@ -23,6 +24,7 @@ def test_live_returns_ok():
     assert response.json() == {"status": "ok"}
 
 
+@pytest.mark.small
 def test_version_returns_app_version(monkeypatch):
     monkeypatch.setenv("APP_VERSION", "1.2.3")
 
@@ -32,6 +34,7 @@ def test_version_returns_app_version(monkeypatch):
     assert response.json() == {"version": "1.2.3"}
 
 
+@pytest.mark.small
 def test_metrics_counts_requests():
     client.get("/api/version")
 
@@ -41,6 +44,8 @@ def test_metrics_counts_requests():
     assert 'handler="/api/version"' in response.text
 
 
+# Medium, not small: opens a TCP connection to localhost (port 1, refused at once).
+@pytest.mark.medium
 def test_ready_returns_503_when_db_down(dead_database):
     response = client.get("/healthz/ready")
 
@@ -49,6 +54,7 @@ def test_ready_returns_503_when_db_down(dead_database):
     assert client.get("/healthz/live").status_code == 200
 
 
+@pytest.mark.medium
 def test_ready_returns_ok_when_db_up(db_client):
     response = db_client.get("/healthz/ready")
 
