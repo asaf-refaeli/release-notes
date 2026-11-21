@@ -21,7 +21,6 @@ Reasons:
 - One Application with both values files: Helm merges them into one release, so only one environment would run and the other file would never be exercised.
 - ApplicationSet with a list generator: one file generates both Applications. Fewer files, but one more concept and a template that can break every environment at once. Worth it from three or more environments.
 - An umbrella chart that includes the chart twice: both environments in one sync, so they succeed or fail together.
-- A dev-to-prod promotion flow (a separate commit or PR per environment): the real-world next step, not needed to show two environments.
 
 ## Consequences
 - Good: the separation is visible in Git, in Argo CD and in the cluster.
