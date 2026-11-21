@@ -32,8 +32,21 @@ jobs:
       - name: Ruff lint
         run: uv run ruff check .
 
+      # Runs even when an earlier check failed, so every problem shows in one run
       - name: Ruff format check
+        if: success() || failure()
         run: uv run ruff format --check .
+
+      # Standalone binary: no Node needed. biome.json limits it to app/static
+      - uses: biomejs/setup-biome@4c91541eaada48f67d7dbd7833600ce162b68f51 # v2.7.1
+        if: success() || failure()
+        with:
+          version: "2.6.7"
+
+      # Lint + format check for the UI's JS and CSS; fails on errors, prints warnings
+      - name: Biome
+        if: success() || failure()
+        run: biome ci
 
   test:
     runs-on: ubuntu-latest

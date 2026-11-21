@@ -1,4 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <title>Release Notes</title>
   <rect width="32" height="32" rx="6" fill="#1e3a5f"/>
   <path d="M10 6h8l5 5v15H10z" fill="#ffffff"/>
   <path d="M18 6v5h5" fill="#bfdbfe"/>

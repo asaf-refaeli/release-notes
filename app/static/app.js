@@ -28,7 +28,8 @@ const VERSION_PATTERN = /^[0-9]+\.[0-9]+\.[0-9]+$/;
 const MESSAGES = {
   versionMissing: "Enter a version number, for example 1.4.0.",
   versionFormat: "Use three numbers separated by dots, for example 1.4.0.",
-  descriptionInvalid: "Keep the description under 5,000 characters, without special control characters.",
+  descriptionInvalid:
+    "Keep the description under 5,000 characters, without special control characters.",
 };
 // The API's event types stay as they are; these are the words people read.
 const EVENT_TEXT = {
@@ -54,7 +55,10 @@ function element(tag, className, text) {
 }
 
 function formatDate(iso) {
-  return new Date(iso).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
+  return new Date(iso).toLocaleString(undefined, {
+    dateStyle: "medium",
+    timeStyle: "short",
+  });
 }
 
 function formatDay(iso) {
@@ -72,7 +76,8 @@ function badge(status) {
 // 400/404/409 send detail as a string; 422 sends a list, one item per invalid field.
 function errorMessage(body) {
   if (typeof body?.detail === "string") return body.detail;
-  if (Array.isArray(body?.detail)) return body.detail.map((item) => item.msg).join("; ");
+  if (Array.isArray(body?.detail))
+    return body.detail.map((item) => item.msg).join("; ");
   return "Request failed";
 }
 
@@ -132,10 +137,16 @@ function rowActions(release) {
   if (release.status === "DRAFT") {
     slots.append(
       actionButton("Edit", "secondary", () => openDialog(release)),
-      actionButton("Publish", "primary next", () => runAction(release, "publish")),
+      actionButton("Publish", "primary next", () =>
+        runAction(release, "publish"),
+      ),
     );
   } else if (release.status === "PUBLISHED") {
-    slots.append(actionButton("Archive", "archive next", () => runAction(release, "archive")));
+    slots.append(
+      actionButton("Archive", "archive next", () =>
+        runAction(release, "archive"),
+      ),
+    );
   }
   const cell = element("td");
   cell.append(slots);
@@ -189,7 +200,8 @@ async function loadReleases() {
       return;
     }
     tbody.replaceChildren(...releases.map(renderRelease));
-    empty.textContent = "No releases yet. Create the first one with New Release.";
+    empty.textContent =
+      "No releases yet. Create the first one with New Release.";
     empty.hidden = releases.length > 0;
     // Refresh the panel with the new data, so it never shows an old status or history.
     const selected = releases.find((release) => release.id === selectedId);
@@ -236,7 +248,10 @@ async function showRelease(release) {
 }
 
 function renderEvent(auditEvent) {
-  const [title, text] = EVENT_TEXT[auditEvent.event_type] ?? [auditEvent.event_type, ""];
+  const [title, text] = EVENT_TEXT[auditEvent.event_type] ?? [
+    auditEvent.event_type,
+    "",
+  ];
   const item = element("li");
   item.append(
     element("span", "dot " + auditEvent.event_type.toLowerCase()),
@@ -259,7 +274,8 @@ async function loadHistory(release) {
     const events = await response.json();
     historyEvents.replaceChildren(...events.reverse().map(renderEvent)); // newest first
   } catch {
-    if (release.id === selectedId) showToast("Cannot reach the server", "error");
+    if (release.id === selectedId)
+      showToast("Cannot reach the server", "error");
   }
 }
 
@@ -268,7 +284,9 @@ async function loadHistory(release) {
 function openDialog(release) {
   clearErrors();
   editing = release;
-  dialogTitle.textContent = release ? "Edit draft " + release.version : "New release";
+  dialogTitle.textContent = release
+    ? "Edit draft " + release.version
+    : "New release";
   saveButton.textContent = release ? "Save changes" : "Create draft";
   versionInput.value = release ? release.version : "";
   descriptionInput.value = release ? release.description : "";
@@ -311,8 +329,14 @@ function showFormError(body) {
   }
   for (const item of body.detail) {
     const field = item.loc?.at(-1);
-    if (field === "version") setFieldError(versionInput, versionError, MESSAGES.versionFormat);
-    else if (field === "description") setFieldError(descriptionInput, descriptionError, MESSAGES.descriptionInvalid);
+    if (field === "version")
+      setFieldError(versionInput, versionError, MESSAGES.versionFormat);
+    else if (field === "description")
+      setFieldError(
+        descriptionInput,
+        descriptionError,
+        MESSAGES.descriptionInvalid,
+      );
     else formError.textContent = item.msg;
   }
 }
@@ -320,10 +344,17 @@ function showFormError(body) {
 async function saveRelease(event) {
   event.preventDefault();
   if (!validateForm()) return;
-  const body = { version: versionInput.value.trim(), description: descriptionInput.value };
+  const body = {
+    version: versionInput.value.trim(),
+    description: descriptionInput.value,
+  };
   // A textarea turns \r\n into \n, so compare with the same line breaks.
   const savedDescription = editing?.description.replaceAll("\r\n", "\n");
-  if (editing && body.version === editing.version && body.description === savedDescription) {
+  if (
+    editing &&
+    body.version === editing.version &&
+    body.description === savedDescription
+  ) {
     dialog.close(); // nothing to send; the API would not record an event either
     showToast("No changes to save", "info");
     return;
@@ -335,18 +366,23 @@ async function saveRelease(event) {
   saveButton.disabled = true;
   cancelButton.disabled = true;
   try {
-    const response = await fetch(draft ? `/api/releases/${draft.id}` : "/api/releases", {
-      method: draft ? "PATCH" : "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    });
+    const response = await fetch(
+      draft ? `/api/releases/${draft.id}` : "/api/releases",
+      {
+        method: draft ? "PATCH" : "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      },
+    );
     if (!response.ok) {
       showFormError(await readJson(response)); // the dialog stays open, nothing typed is lost
       if (response.status === 409) await loadReleases(); // the list was out of date
       return;
     }
     const saved = await response.json();
-    const message = draft ? `Draft ${saved.version} saved` : `Draft ${saved.version} created`;
+    const message = draft
+      ? `Draft ${saved.version} saved`
+      : `Draft ${saved.version} created`;
     dialog.close();
     selectedId = saved.id;
     showToast(message, "success");
@@ -364,13 +400,18 @@ async function saveRelease(event) {
 
 async function runAction(release, action) {
   try {
-    const response = await fetch(`/api/releases/${release.id}/${action}`, { method: "POST" });
+    const response = await fetch(`/api/releases/${release.id}/${action}`, {
+      method: "POST",
+    });
     if (!response.ok) {
       showToast(errorMessage(await readJson(response)), "error");
       if (response.status === 409) await loadReleases(); // the list was out of date
       return;
     }
-    showToast(`${release.version} ${action === "publish" ? "published" : "archived"}`, "success");
+    showToast(
+      `${release.version} ${action === "publish" ? "published" : "archived"}`,
+      "success",
+    );
     await loadReleases();
   } catch {
     showToast("Cannot reach the server", "error");
@@ -392,7 +433,11 @@ dialog.addEventListener("close", () => {
   clearErrors();
 });
 form.addEventListener("submit", saveRelease);
-versionInput.addEventListener("input", () => setFieldError(versionInput, versionError, ""));
-descriptionInput.addEventListener("input", () => setFieldError(descriptionInput, descriptionError, ""));
+versionInput.addEventListener("input", () =>
+  setFieldError(versionInput, versionError, ""),
+);
+descriptionInput.addEventListener("input", () =>
+  setFieldError(descriptionInput, descriptionError, ""),
+);
 loadVersion();
 loadReleases();
