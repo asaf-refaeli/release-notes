@@ -76,6 +76,9 @@ Their purpose is to explain why each choice was made.
 - One image for the app, the migration Job and the UI (ADR-0009)
 - Migration ordering: Argo CD Sync hook and sync waves, DB -1, Job 0, app 1 (ADR-0010)
 - Database credentials: Secret generated in the cluster by a PreSync Job in the chart, Kubernetes builds `DATABASE_URL` (ADR-0011)
+- Traffic entry: Traefik with Gateway API; the chart ships an HTTPRoute (ADR-0012)
+- Environments: one chart, two values files, two Applications, same image in both (ADR-0013)
+- GitOps layout: app of apps with plain Applications, self-managed Argo CD, two AppProjects (ADR-0014)
 <!-- Add each decision here once it's made. Until something is listed, ask before choosing. -->
 
 ## Conventions

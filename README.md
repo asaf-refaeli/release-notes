@@ -201,3 +201,6 @@ Dockerfile    The container image
 | [0009](docs/adr/0009-one-image.md) | One image for the app, the migration Job and the UI |
 | [0010](docs/adr/0010-migration-ordering.md) | Migration Job as an Argo CD Sync hook, ordered by sync waves |
 | [0011](docs/adr/0011-database-credentials.md) | Database password Secret generated in the cluster by a PreSync Job; Kubernetes builds `DATABASE_URL` |
+| [0012](docs/adr/0012-traffic-entry.md) | Traffic entry: Traefik with Gateway API; the chart ships an HTTPRoute per environment |
+| [0013](docs/adr/0013-environments.md) | Environments: one chart, two values files, two Applications; same image in both |
+| [0014](docs/adr/0014-gitops-layout.md) | GitOps layout: app of apps with plain Applications, self-managed Argo CD, two projects |
