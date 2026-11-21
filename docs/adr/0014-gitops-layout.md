@@ -1,7 +1,7 @@
 # ADR-0014: GitOps layout: app of apps, self-managed Argo CD, two projects
 
 ## Context
-- The `gitops` repo must bring a clean kind cluster to a running system with one command (`scripts/up.sh`), and everything after the bootstrap should come from Git.
+- The `kind-gitops` repo must bring a clean kind cluster to a running system with one command (`scripts/up.sh`), and everything after the bootstrap should come from Git.
 - Argo CD cannot install itself, so something imperative has to start it.
 - Besides the app, the cluster needs platform components: Gateway API CRDs, Traefik and metrics-server (for the HPA), plus Argo CD itself.
 
@@ -25,6 +25,6 @@
 ## Consequences
 - Good: after `up.sh`, every change to the platform or the app is a commit. Argo CD shows the whole cluster in one tree.
 - Good: the app's project cannot deploy outside its namespaces or create cluster-wide resources.
-- Bad: root and the `platform` project are admin-level by nature, because root can create Applications in any project and `platform` manages Argo CD itself. Push access to `gitops` must be restricted.
+- Bad: root and the `platform` project are admin-level by nature, because root can create Applications in any project and `platform` manages Argo CD itself. Push access to `kind-gitops` must be restricted.
 - Bad: a bad Argo CD config committed to Git can stop Argo CD, and then nothing applies the fix. The break-glass is a manual `helm upgrade` with good values.
 - Bad: the waves depend on the custom Application health check. Without it, a wave waits only for the child Application to be created.

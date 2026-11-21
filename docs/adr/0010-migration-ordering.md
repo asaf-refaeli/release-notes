@@ -4,7 +4,7 @@
 - One Helm chart holds Postgres, the migration Job (`alembic upgrade head`, same image as the app, ADR-0009) and the app Deployment.
 - On a first install the order must be: Postgres ready, then the migration, then the app. On an upgrade the migration must finish before new pods serve. Migrations are expand-only, so old pods keep working on the new schema.
 - Helm applies all normal resources of a release at once; it can only order resources by making them hooks.
-- Argo CD is the only deploy path: the `gitops` repo syncs this chart to every environment. CI validates the chart (lint and schema) but does not install it.
+- Argo CD is the only deploy path: the `kind-gitops` repo syncs this chart to every environment. CI validates the chart (lint and schema) but does not install it.
 
 ## Decision
 Run the migration Job as an Argo CD `Sync` hook (`hook-delete-policy: BeforeHookCreation`), ordered by sync waves: Postgres StatefulSet `-1`, migration Job `0`, app Deployment `1`. Argo CD waits for each wave to be healthy before the next one. Reasons:

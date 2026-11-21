@@ -67,7 +67,7 @@ Decisions are documented as ADRs in `docs/adr/` using `docs/adr/0000-template.md
 Their purpose is to explain why each choice was made.
 - Use GitHub Flow as git workflow
 - Use GitHub Actions for CI
-- Separate GitOps repo (`gitops`); the Helm chart lives in this repo
+- Separate GitOps repo (`kind-gitops`); the Helm chart lives in this repo
 - Sync routes with sync SQLAlchemy (ADR-0004)
 - Concurrent writes: row lock plus a partial unique index (ADR-0005)
 - Tests run against a real Postgres through testcontainers (ADR-0006)
