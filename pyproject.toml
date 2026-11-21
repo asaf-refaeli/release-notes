@@ -27,6 +27,11 @@ dev = [
 [tool.pytest.ini_options]
 pythonpath = ["."]
 testpaths = ["tests"]
+addopts = "--strict-markers"
+markers = [
+    "small: one process, no network, no files, no database (Google test sizes)",
+    "medium: one machine: localhost network, files, or a real Postgres via testcontainers",
+]
 
 [tool.ruff.lint]
 select = ["E", "W", "F", "I", "B", "UP", "S", "FAST", "ASYNC"]

@@ -13,6 +13,20 @@ from app.db import get_engine  # noqa: E402  (needs DATABASE_URL set first)
 from app.main import app  # noqa: E402
 from app.models import Base  # noqa: E402
 
+SIZES = {"small", "medium"}
+
+
+# --strict-markers rejects unknown marker names; this rejects a missing or double size.
+def pytest_collection_modifyitems(items):
+    wrong = []
+    for item in items:
+        sizes = {mark.name for mark in item.iter_markers()} & SIZES
+        if len(sizes) != 1:
+            wrong.append(f"{item.nodeid}: {sorted(sizes) or 'no size'}")
+    if wrong:
+        heading = "Every test needs exactly one size marker (small or medium):"
+        raise pytest.UsageError("\n".join([heading, *wrong]))
+
 
 @pytest.fixture(scope="session")
 def postgres_url():

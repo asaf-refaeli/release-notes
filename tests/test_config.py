@@ -3,6 +3,8 @@ from pydantic import ValidationError
 
 from app.config import Settings
 
+pytestmark = pytest.mark.small
+
 
 def test_settings_require_database_url(monkeypatch):
     monkeypatch.delenv("DATABASE_URL")

@@ -1,7 +1,11 @@
 import json
 import logging
 
+import pytest
+
 from app.log_config import setup_logging
+
+pytestmark = pytest.mark.small
 
 
 def test_log_line_is_json(capsys):
