@@ -29,19 +29,45 @@ Each decision links to its full record in `docs/adr/`. Proof of the rollout and 
 
 ## Rollout failures on a real cluster
 
-- **A bad version that passes the checks.** Readiness and `minReadySeconds: 5` pass, the rollout completes, and the
-  errors start later. Nothing rolls back automatically: Argo CD only reports `Healthy`. Detection is the checker and
-  alerts; recovery is `rollback.sh`. Real cluster: progressive delivery with automated analysis (Argo Rollouts) and
-  alerts on the error rate.
-- **Readiness passes before the schema exists.** `/healthz/ready` checks only `SELECT 1`, so a pod can serve before a
-  migration it needs has run. The migration Job runs first (ADR-0010), but the probe cannot prove it. Real cluster: a
-  schema-aware readiness check or a PostSync smoke test.
-- **A failed migration blocks the release.** The sync stops before any new pod starts, and old pods keep serving. The
-  release is stuck until a fix ships. A rollback across a migration also fails, because the old image does not know
-  the newer Alembic revision. Real cluster: a migration Job that skips an unknown revision, drilled before it ships.
-- **Connection budget exhausted during the surge.** The new pod opens its own pool while old pods still hold theirs. If
-  the budget is exceeded, the new pod cannot connect, fails readiness, and the rollout stalls. The chart checks the
-  budget at render time; PgBouncer is the real-world answer.
+### Load balancer timers
+
+- **Issue:** On kind, the only proxy is Traefik, and its timers are known and set in this repo. A cloud load balancer
+  sits in front with its own timers, and some are fixed: Google's backend keep-alive is 600 s, AWS ALB's idle timeout
+  defaults to 60 s. The keep-alive value chosen on kind cannot be copied to a cloud cluster. During a rollout, pods
+  closing their connections make the resulting 502s more likely.
+- **How I would handle it:** Read the load balancer's idle timeout and backend keep-alive first. Set the app's
+  keep-alive above that value, and Traefik's (or the ingress controller's) below it. Keep the numbers in one place with
+  a comment and an ADR, and test under steady traffic with the checker before trusting them.
+
+### Shutdown outside the cluster
+
+- **Issue:** The 5 s preStop sleep proven on kind covers Kubernetes and Traefik only. A cloud load balancer removes a pod
+  on its own schedule, with a deregistration delay Kubernetes does not control. The kind margin says nothing about a
+  cloud cluster's timing. Every rolling update terminates old pods, so a too-short sleep shows up as failed requests
+  during the rollout.
+- **How I would handle it:** Measure the load balancer's deregistration delay, not only Kubernetes' endpoint removal.
+  Set the preStop sleep above it, or use a readiness gate so the load balancer marks the pod unhealthy before shutdown.
+  Confirm with the checker during a real rollout.
+
+### Capacity and disruption around the app
+
+- **Issue:** A real cluster has several nodes, a cluster autoscaler, node drains for upgrades, and PDBs that compete with
+  rollouts. kind has one fixed node with no drains, so a drain or a node loss during a rollout cannot happen there. A
+  full node can still stall a surge pod on kind, under load. During a rollout, a pod with no free node stays Pending and
+  the rollout stops, and a drain at the same time can remove a pod before its replacement is Ready.
+- **How I would handle it:** Run the cluster autoscaler and keep spare capacity for the surge pod. Check the PDB before
+  any node drain, and schedule node upgrades so they do not overlap with a release. Use a managed database so a node
+  drain does not take the only database pod down, and every app pod with it.
+
+### Observability after the rollout
+
+- **Issue:** The checker runs for a few minutes and sees only its own window. Metrics-server reports CPU and memory only.
+  The app already exposes request counts and latency at `/metrics`, but Prometheus is not installed and the
+  ServiceMonitor is off, so nothing alerts on a failure after the checker stops. A rollout can finish green in Argo CD
+  and still start failing minutes later, with nothing to say it is time to run `rollback.sh`.
+- **How I would handle it:** Install Prometheus (kube-prometheus-stack) and enable the ServiceMonitor to scrape
+  `/metrics`. Alert on the 5xx rate and latency for the release-notes Service, and watch those alerts during each
+  rollout so a later failure can be traced to the release.
 
 ## Scaling path
 
