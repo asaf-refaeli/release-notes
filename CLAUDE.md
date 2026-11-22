@@ -22,9 +22,7 @@ The plan lives outside this repo in `../docs/project-plan.md`.
 - Chart schemas, per test case: `for f in chart/ci/*-values.yaml; do helm template ci chart -f "$f" | kubeconform -strict -summary -schema-location default -schema-location 'https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json'; done`
 - Chart testing (`ct lint`, pinned image, run with Podman): `podman run --rm -v "$PWD":/work:Z -w /work quay.io/helmpack/chart-testing:v3.15.0@sha256:54317f2d93730ea9ca1236e3d79cd95d74110b8d733b6ab124e5829209b5f4e4 sh -c 'git config --global --add safe.directory /work && ct lint --charts chart --validate-maintainers=false --check-version-increment=false'`
 - Local install on kind (only when asked; Argo CD is the deploy path): `podman save` the image and `kind load image-archive ... --name release-notes`; a namespace labelled `pod-security.kubernetes.io/enforce=restricted`; `helm install release-notes chart -n <ns> --set image.repository=localhost/release-notes --set image.tag=local`. Every command takes `--context kind-release-notes` (kubectl) or `--kube-context kind-release-notes` (helm). Plain Helm ignores the hooks and sync waves, so Postgres waits for the Secret Job and the migration Job may fail 1-2 times before Postgres is Ready; `helm upgrade` cannot change the existing Job (delete it first). Full commands in the README.
-
-Planned, not built yet (move each line up when it lands):
-- Rollout check: `uv run scripts/rollout_check.py --url <base-url>`
+- Rollout check: `uv run scripts/rollout_check.py http://prod.localhost 300` (URL through Traefik, not port-forward; seconds to run). Prints ok/failed counts and when each version answered; exits 1 on any failure.
 
 ## Architecture
 
