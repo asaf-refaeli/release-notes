@@ -1,6 +1,6 @@
 [project]
 name = "release-notes"
-version = "0.1.0"
+version = "0.1.1"
 description = "Internal tool to record and list what shipped in each release"
 readme = "README.md"
 requires-python = ">=3.14"
