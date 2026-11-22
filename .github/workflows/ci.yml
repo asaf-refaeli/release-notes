@@ -320,3 +320,68 @@ jobs:
           helm package chart --destination dist
           helm push dist/*.tgz "oci://ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/charts" \
             --registry-config "$HOME/.docker/config.json"
+
+  # Commits the released versions to kind-gitops; Argo CD deploys from there. That commit is the deploy; reverting it is the rollback.
+  update-gitops:
+    needs: [release]
+    # Without a status function GitHub adds success(), which also requires the jobs before release; those are skipped on a release commit
+    if: >-
+      !cancelled() && needs.release.result == 'success'
+      && (needs.release.outputs.app_version != '' || needs.release.outputs.chart_version != '')
+    runs-on: ubuntu-latest
+    # Serializes pushes to kind-gitops across runs
+    concurrency: kind-gitops
+    # GITHUB_TOKEN is not used; access to kind-gitops comes from the GitHub App token
+    permissions: {}
+    steps:
+      # Short-lived token for the App, which is installed on kind-gitops only
+      - id: token
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          client-id: ${{ vars.GITOPS_APP_CLIENT_ID }}
+          private-key: ${{ secrets.GITOPS_APP_PRIVATE_KEY }}
+          repositories: kind-gitops
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: ${{ github.repository_owner }}/kind-gitops
+          token: ${{ steps.token.outputs.token }}
+
+      # Quoted version so a version like 1.10 is never read as a number
+      - name: Update pins
+        env:
+          APP_VERSION: ${{ needs.release.outputs.app_version }}
+          IMAGE_DIGEST: ${{ needs.release.outputs.image_digest }}
+          CHART_VERSION: ${{ needs.release.outputs.chart_version }}
+        run: |
+          if [ -n "$APP_VERSION" ]; then
+            for env in dev prod; do
+              yq -i '.image.tag = strenv(APP_VERSION) | .image.tag style="double" | .image.digest = strenv(IMAGE_DIGEST)' workloads/apps/release-notes/values-$env.yaml
+            done
+          fi
+          if [ -n "$CHART_VERSION" ]; then
+            for env in dev prod; do
+              yq -i '(.spec.sources[] | select(.chart == "release-notes") | .targetRevision) = strenv(CHART_VERSION) | (.spec.sources[] | select(.chart == "release-notes") | .targetRevision) style="double"' bootstrap/apps/release-notes-$env.yaml
+            done
+          fi
+
+      # One commit for all pins, so they deploy and revert together
+      - name: Commit and push
+        env:
+          APP_SLUG: ${{ steps.token.outputs.app-slug }}
+          APP_VERSION: ${{ needs.release.outputs.app_version }}
+          CHART_VERSION: ${{ needs.release.outputs.chart_version }}
+        run: |
+          git config user.name "${APP_SLUG}[bot]"
+          git config user.email "${APP_SLUG}[bot]@users.noreply.github.com"
+          # Only the files this job edits: the App token can push, so nothing else gets staged
+          git add workloads/apps/release-notes/values-dev.yaml workloads/apps/release-notes/values-prod.yaml \
+            bootstrap/apps/release-notes-dev.yaml bootstrap/apps/release-notes-prod.yaml
+          if git diff --cached --quiet; then
+            echo "Pins already up to date"
+            exit 0
+          fi
+          git commit -m "chore(release-notes): deploy app ${APP_VERSION:-unchanged}, chart ${CHART_VERSION:-unchanged}" \
+            -m "From ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/commit/${GITHUB_SHA}"
+          git pull --rebase
+          git push
