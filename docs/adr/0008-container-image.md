@@ -17,6 +17,7 @@ Two stages on `docker.io/library/python:3.14.10-alpine3.24` (tag + digest): the 
 - **Files owned by root, not `COPY --chown`:** the app can read its code but not change it.
 - **`CMD`, not `ENTRYPOINT`:** the migration Job runs `alembic upgrade head` from the same image by replacing the command (one image for app, migrations and UI: ADR-0009).
 - **`--timeout-graceful-shutdown 20`:** 20 s plus the 5 s preStop sleep stays under the 30 s grace period.
+- **`--timeout-keep-alive 100`:** above Traefik's 90 s upstream idle timeout, so the proxy closes idle connections first (ADR-0012). Uvicorn's default is 5 s.
 - **No `HEALTHCHECK`:** Buildah's default OCI format does not store it; Kubernetes probes do this job.
 - `scripts/smoke-test.sh` checks the result on every build: non-root, migrations run, read-only with no `/tmp`, no capabilities, API and UI served, exit code 0 on SIGTERM.
 
