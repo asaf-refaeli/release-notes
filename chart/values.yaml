@@ -85,6 +85,15 @@ resources:
     memory: 256Mi
 
 # Liveness never touches the database, so a DB outage never restarts the app.
+# Liveness and readiness wait until this passes, so a slow first start (a cold node) gets up to
+# 2 s x 30 = 60 s instead of being killed by liveness after 30 s.
+startupProbe:
+  httpGet:
+    path: /healthz/live
+    port: http
+  periodSeconds: 2
+  failureThreshold: 30
+
 livenessProbe:
   httpGet:
     path: /healthz/live

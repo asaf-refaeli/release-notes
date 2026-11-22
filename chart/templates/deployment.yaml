@@ -57,6 +57,10 @@ spec:
             - name: DB_MAX_OVERFLOW
               value: {{ .Values.database.maxOverflow | quote }}
             {{- include "release-notes.databaseEnv" . | nindent 12 }}
+          {{- with .Values.startupProbe }}
+          startupProbe:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
           {{- with .Values.livenessProbe }}
           livenessProbe:
             {{- toYaml . | nindent 12 }}
