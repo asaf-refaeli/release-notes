@@ -82,6 +82,8 @@ The pipeline builds once and runs everything on that image. This is the shape it
 ## Roadmap
 
 - **E2E tests:** Python Playwright against the built image, covering every UI feature and the style checks.
+- **JavaScript unit tests:** Vitest on the `app.js` functions with the API faked, so a failure names the function, not
+  just the broken flow. An addition to the E2E tests, not a replacement: they miss wiring problems (URLs, CSP, ids).
 - **Load testing with k6:** parallel users and latency thresholds, in CI after each deploy.
 - **DAST:** a nightly OWASP ZAP API scan driven by `/openapi.json`, against the released image running with Postgres,
   plus a Trivy rescan of the deployed digest for newly published CVEs.
