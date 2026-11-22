@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.3](https://github.com/asaf-refaeli/release-notes/compare/v0.1.2...v0.1.3) (2026-11-22)
+
+
+### Bug Fixes
+
+* revert the version placeholder change ([#45](https://github.com/asaf-refaeli/release-notes/issues/45)) ([2a5fc0d](https://github.com/asaf-refaeli/release-notes/commit/2a5fc0da19bf4e575f094246221a311ced05c478))
+
 ## [0.1.2](https://github.com/asaf-refaeli/release-notes/compare/v0.1.1...v0.1.2) (2026-11-22)
 
 
