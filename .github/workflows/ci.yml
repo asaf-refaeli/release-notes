@@ -301,11 +301,14 @@ jobs:
         if: steps.release.outputs.release_created == 'true'
         env:
           VERSION: ${{ steps.release.outputs.version }}
-          # main before this push; with squash merge, the release commit's parent
-          PARENT_SHA: ${{ github.event.before }}
+          RELEASE_SHA: ${{ steps.release.outputs.sha }}
+          GH_TOKEN: ${{ github.token }}
         run: |
           repo="ghcr.io/${GITHUB_REPOSITORY,,}"
-          skopeo copy --preserve-digests "docker://$repo:sha-${PARENT_SHA::7}" "docker://$repo:$VERSION"
+          # The release commit only changes versions; its parent (squash merge) is the last real change,
+          # whose image passed every gate. Asked from GitHub, so it works in whichever run creates the release.
+          parent=$(gh api "repos/$GITHUB_REPOSITORY/commits/$RELEASE_SHA" --jq '.parents[0].sha')
+          skopeo copy --preserve-digests "docker://$repo:sha-${parent::7}" "docker://$repo:$VERSION"
           echo "digest=$(skopeo inspect --format '{{.Digest}}' "docker://$repo:$VERSION")" >> "$GITHUB_OUTPUT"
 
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1

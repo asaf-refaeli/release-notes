@@ -61,7 +61,7 @@
   "packages": {
     ".": {
       "release-type": "python",
-      "package-name": "release-notes",
+      "package-name": "",
       "include-component-in-tag": false,
       "exclude-paths": [
         "chart"
