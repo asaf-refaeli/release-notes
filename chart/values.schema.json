@@ -97,6 +97,7 @@
     "podSecurityContext": { "type": "object" },
     "securityContext": { "type": "object" },
     "resources": { "type": "object" },
+    "startupProbe": { "type": "object" },
     "livenessProbe": { "type": "object" },
     "readinessProbe": { "type": "object" },
     "strategy": { "type": "object" },
