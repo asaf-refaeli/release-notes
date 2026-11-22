@@ -83,6 +83,8 @@ The pipeline builds once and runs everything on that image. This is the shape it
 
 - **E2E tests:** Python Playwright against the built image, covering every UI feature and the style checks.
 - **Load testing with k6:** parallel users and latency thresholds, in CI after each deploy.
+- **DAST:** a nightly OWASP ZAP API scan driven by `/openapi.json`, against the released image running with Postgres,
+  plus a Trivy rescan of the deployed digest for newly published CVEs.
 - **Post-deploy write check:** a PostSync Job in dev that creates a release, reads it back and checks its event.
 - **Rollback across a migration:** the migration Job skips an unknown revision (option A), after a drill on dev.
 - **Registry mirror:** pull-through cache for GHCR.
