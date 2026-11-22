@@ -14,7 +14,7 @@ Use a pessimistic row lock for rules on one release, and a database constraint f
 - Rules stay as plain Python checks that raise specific errors, so each failure gets its exact code (404, 409, 400).
 - One transaction per action: lock, check, change, insert the event, commit.
 
-Evidence (Task 7 concurrency tests): with `FOR UPDATE` removed, the double-publish test fails every run (`['ok', 'ok']`), and the edit-versus-publish test records an edit after publish. With the lock, both pass. The same-version test passes without the lock, because the index protects it.
+Evidence (`tests/test_concurrency.py`): with `FOR UPDATE` removed, the double-publish test fails every run (`['ok', 'ok']`), and the edit-versus-publish test records an edit after publish. With the lock, both pass. The same-version test passes without the lock, because the index protects it.
 
 ## Alternatives considered
 - Atomic conditional update (`UPDATE releases SET status='PUBLISHED' WHERE id=:id AND status='DRAFT'`, then check the row count): no lock and no wait. Rejected because a count of 0 does not say why (unknown id, wrong state, blank description), so the API cannot return the right code without extra queries, and the rules move into SQL.

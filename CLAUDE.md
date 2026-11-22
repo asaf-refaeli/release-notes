@@ -5,9 +5,6 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Purpose
 
 A small "Release Notes" service (API, minimal UI, Postgres) built for a DevOps home assignment. Most of the work is the infrastructure around it: a hardened image, a Helm chart, a CI/CD pipeline and a zero-downtime rollout. The backend lifecycle (DRAFT -> PUBLISHED -> ARCHIVED) and the audit trail follow the assignment spec exactly; keep everything else small.
-
-The plan lives outside this repo in `../docs/project-plan.md`.
-
 ## Commands
 
 - Install deps: `uv sync` (`uv.lock` is committed)
@@ -61,7 +58,7 @@ Rules:
 - Chart: the Postgres pod template carries only stable labels (selector labels + component); version or chart labels there would restart the only DB pod on every app release.
 
 ## Decisions
-Decisions are documented as ADRs in `docs/adr/` using `docs/adr/0000-template.md` (a `DECISIONS.md` index comes before CI).
+Decisions are documented as ADRs in `docs/adr/` using `docs/adr/0000-template.md`, indexed in `DECISIONS.md`.
 Their purpose is to explain why each choice was made.
 - Use GitHub Flow as git workflow
 - Use GitHub Actions for CI

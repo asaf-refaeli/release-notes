@@ -2,7 +2,7 @@
 
 A small internal service for recording what shipped in each release: a FastAPI API on Postgres, with a draft → published → archived lifecycle and an audit trail of every change.
 
-> **Status:** home assignment, in progress. Built: the service with health checks, structured logs, metrics, the release lifecycle, the audit trail, a UI for all of it, a hardened container image, and a Helm chart for the app, its Postgres and the migrations. Next: the GitOps deployment, CI/CD and a zero-downtime rollout.
+> **Status:** complete. The service, its UI, a hardened container image, a Helm chart, a CI/CD pipeline, and a GitOps deployment to dev and prod on kind with Argo CD. Deployment repo and the single command (`./scripts/up.sh`): [kind-gitops](https://github.com/asaf-refaeli/kind-gitops). Zero-downtime rollout and one-command rollback, proven with 0 failed requests: [docs/verification.md](docs/verification.md). Decisions and what would still break on a real cluster: [DECISIONS.md](DECISIONS.md).
 
 ## Quickstart
 
@@ -188,19 +188,4 @@ Dockerfile    The container image
 
 ## Decisions
 
-| ADR | Decision |
-|---|---|
-| [0001](docs/adr/0001-git-workflow.md) | GitHub Flow with squash merges |
-| [0002](docs/adr/0002-ci-platform.md) | GitHub Actions for CI |
-| [0003](docs/adr/0003-helm-chart-location.md) | Helm chart in this repo; deployment state in a separate GitOps repo |
-| [0004](docs/adr/0004-request-handling-sync.md) | Sync routes with sync SQLAlchemy |
-| [0005](docs/adr/0005-concurrent-writes.md) | Row lock plus a partial unique index for concurrent writes |
-| [0006](docs/adr/0006-tests-on-real-postgres.md) | Tests run against a real Postgres through testcontainers |
-| [0007](docs/adr/0007-ui-vanilla-js.md) | UI: static files and plain JavaScript on the JSON API, strict CSP |
-| [0008](docs/adr/0008-container-image.md) | Container image: Python on Alpine, two stages, non-root, read-only |
-| [0009](docs/adr/0009-one-image.md) | One image for the app, the migration Job and the UI |
-| [0010](docs/adr/0010-migration-ordering.md) | Migration Job as an Argo CD Sync hook, ordered by sync waves |
-| [0011](docs/adr/0011-database-credentials.md) | Database password Secret generated in the cluster by a PreSync Job; Kubernetes builds `DATABASE_URL` |
-| [0012](docs/adr/0012-traffic-entry.md) | Traffic entry: Traefik with Gateway API; the chart ships an HTTPRoute per environment |
-| [0013](docs/adr/0013-environments.md) | Environments: one chart, two values files, two Applications; same image in both |
-| [0014](docs/adr/0014-gitops-layout.md) | GitOps layout: app of apps with plain Applications, self-managed Argo CD, two projects |
+Every decision with its ADR, what would still break on a real cluster, and next steps: [DECISIONS.md](DECISIONS.md).
