@@ -1,0 +1,39 @@
+version: 2
+updates:
+  # Pinned action SHAs and their version comments, in every workflow
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    # Wait 7 days after a release; security updates are not delayed
+    cooldown:
+      default-days: 7
+    # A pipeline change does not change the app, so no release
+    commit-message:
+      prefix: ci
+
+  # The Dockerfile's FROM lines (Python on Alpine, uv), by tag and digest
+  - package-ecosystem: docker
+    directory: /
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7
+    # A new base image changes what runs, so the PR title is "fix(deps): ..." and release-please makes a patch release
+    commit-message:
+      prefix: fix
+      include: scope
+
+  # pyproject.toml and uv.lock
+  - package-ecosystem: uv
+    directory: /
+    schedule:
+      interval: weekly
+    # uv's docs recommend a cooldown, so a just-published version that uv cannot lock yet does not open a PR
+    cooldown:
+      default-days: 7
+    # Runtime dependencies ship in the image: patch release. Dev-only (pytest, ruff): no release
+    commit-message:
+      prefix: fix
+      prefix-development: chore
+      include: scope
