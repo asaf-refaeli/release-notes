@@ -11,7 +11,12 @@ permissions:
   contents: read
 
 jobs:
+  # Skipped on the release PR and release commit: they only change versions and changelogs,
+  # and the release tags the parent's image, already built and tested
   lint:
+    if: >-
+      github.head_ref != 'release-please--branches--main'
+      && !startsWith(github.event.head_commit.message, 'chore: release main')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -49,6 +54,9 @@ jobs:
         run: biome ci
 
   test:
+    if: >-
+      github.head_ref != 'release-please--branches--main'
+      && !startsWith(github.event.head_commit.message, 'chore: release main')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -70,6 +78,9 @@ jobs:
         run: uv run pytest
 
   sast:
+    if: >-
+      github.head_ref != 'release-please--branches--main'
+      && !startsWith(github.event.head_commit.message, 'chore: release main')
     runs-on: ubuntu-latest
     container: semgrep/semgrep:1.185.0@sha256:67518c174185a2043fdbed16c70631b79209499b3671178e7194379b48295a0d
     permissions:
@@ -135,6 +146,9 @@ jobs:
   # the push is a separate main-only job.
   image:
     needs: [lint, test, sast]
+    if: >-
+      github.head_ref != 'release-please--branches--main'
+      && !startsWith(github.event.head_commit.message, 'chore: release main')
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -201,24 +215,108 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       packages: write
-    outputs:
-      tag: ${{ steps.push.outputs.tag }}
-      digest: ${{ steps.push.outputs.digest }}
     steps:
       - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
         with:
           name: image
 
+      # Writes ~/.docker/config.json, which skopeo reads
+      - uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
       # Pushes the same image that was tested; the digest is what deployments pin
       - name: Push to GHCR
-        id: push
-        env:
-          REGISTRY_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           repo="ghcr.io/${GITHUB_REPOSITORY,,}"
           tag="sha-${GITHUB_SHA::7}"
-          echo "$REGISTRY_TOKEN" | skopeo login --username "$GITHUB_ACTOR" --password-stdin ghcr.io
           skopeo copy --digestfile digest.txt docker-archive:image.tar "docker://$repo:$tag"
-          echo "tag=$tag" >> "$GITHUB_OUTPUT"
-          echo "digest=$(cat digest.txt)" >> "$GITHUB_OUTPUT"
           echo "Pushed $repo:$tag@$(cat digest.txt)"
+
+  # Opens or updates the release PR on each merge; when the release PR merges, creates the tags and GitHub Releases.
+  # Runs only after every gate passed, so the release PR only lists commits whose image is in GHCR.
+  release:
+    # Skipped is allowed (the release commit skips the gates), so every gate is listed to catch a failure
+    needs: [lint, test, sast, helm, image, push]
+    if: >-
+      !cancelled() && !contains(needs.*.result, 'failure')
+      && github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    # Two quick merges must not update the release PR at the same time
+    concurrency: release-please
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+      packages: write
+    # Empty unless that package was released in this run
+    outputs:
+      app_version: ${{ steps.release.outputs.version }}
+      image_digest: ${{ steps.tag.outputs.digest }}
+      chart_version: ${{ steps.release.outputs['chart--version'] }}
+    steps:
+      - id: release
+        uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
+
+      # release-please bumps pyproject.toml but has no uv.lock updater, so the next PR's `uv sync --locked`
+      # would fail. Re-lock on the release PR branch so the version bump lands in both files.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        if: steps.release.outputs.pr
+        with:
+          ref: ${{ fromJSON(steps.release.outputs.pr).headBranchName }}
+
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        if: steps.release.outputs.pr
+        with:
+          version: "0.12.7"
+
+      - name: Update uv.lock on the release PR
+        if: steps.release.outputs.pr
+        run: |
+          uv lock
+          if git diff --quiet uv.lock; then
+            echo "uv.lock already up to date"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add uv.lock
+          git commit -m "chore: update uv.lock"
+          git push
+
+      # Writes ~/.docker/config.json; skopeo reads it, and helm push through --registry-config
+      - uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
+        if: steps.release.outputs.releases_created == 'true'
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Adds the version tag to the parent commit's image, built and tested when it merged:
+      # same manifest, same digest, no rebuild
+      - name: Tag the image with the version
+        id: tag
+        if: steps.release.outputs.release_created == 'true'
+        env:
+          VERSION: ${{ steps.release.outputs.version }}
+          # main before this push; with squash merge, the release commit's parent
+          PARENT_SHA: ${{ github.event.before }}
+        run: |
+          repo="ghcr.io/${GITHUB_REPOSITORY,,}"
+          skopeo copy --preserve-digests "docker://$repo:sha-${PARENT_SHA::7}" "docker://$repo:$VERSION"
+          echo "digest=$(skopeo inspect --format '{{.Digest}}' "docker://$repo:$VERSION")" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        if: steps.release.outputs['chart--release_created'] == 'true'
+        with:
+          persist-credentials: false
+
+      # Publishes the released chart as an OCI artifact; the GitOps repo pins this version
+      - name: Push the chart to GHCR
+        if: steps.release.outputs['chart--release_created'] == 'true'
+        run: |
+          helm package chart --destination dist
+          helm push dist/*.tgz "oci://ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/charts" \
+            --registry-config "$HOME/.docker/config.json"
